@@ -7,7 +7,7 @@
 ![Electron](https://img.shields.io/badge/Electron-28.0-47848F.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)
 
-一个基于 Electron 的 Kemono 下载器桌面应用，采用纯前端技术实现，无需 Python 环境。
+一个基于 Electron 的 Kemono 下载器桌面应用，采用纯前端技术实现，只需node环境。
 
 [功能特性](#-功能特性) • [快速开始](#-快速开始) • [构建打包](#-构建打包) • [技术栈](#-技术栈)
 
@@ -19,23 +19,20 @@
 
 - 🚀 **纯前端实现** - 所有爬虫逻辑使用 JavaScript 实现，无需 Python 运行时
 - 💻 **跨平台支持** - 基于 Electron，支持 Windows、macOS 和 Linux
-- 🎨 **赛博朋克 UI** - 现代化的用户界面，实时进度显示
+- 🎨 **现代化 UI** - 现代化的用户界面，实时进度显示
 - ⚡ **并发下载** - 可配置 1-10 个并发任务，提升下载效率
 - 📊 **进度追踪** - 实时显示下载进度、文件统计和任务状态
 - 💾 **断点续传** - 自动保存进度，支持任务中断后继续
 - 🔒 **反爬虫绕过** - 内置反爬虫策略，自动处理访问限制
 - 🪟 **窗口记忆** - 自动记住窗口位置和大小
 - 🎯 **智能跳过** - 可选跳过已存在的文件，避免重复下载
-
-## 📸 预览
+！！下载失败请自行解决网络代理问题！！
 
 <div align="center">
 
-### 主界面
+### 界面预览
 ![主界面](assets/screenshot.png)
 
-### 下载中
-![下载进度](assets/screenshot-running.png)
 
 </div>
 
@@ -45,7 +42,7 @@
 
 **Windows 用户可直接下载编译好的程序：**
 
-📥 [前往 Releases 下载最新版本](https://github.com/fengmic/kemono-downloader/releases)
+📥 [前往 Releases 下载最新版本](https://github.com/fengmic/Kemono-spider/releases/)
 
 下载后解压即可使用，无需安装任何依赖！
 
@@ -55,17 +52,17 @@
 
 #### 前置要求
 
-- Node.js 16.0 或更高版本
+- Node.js 18.0 或更高版本
 - npm 或 yarn 包管理器
 
 #### 安装
 
 ```bash
 # 克隆仓库
-git clone https://github.com/fengmic/kemono-downloader.git
+git clone https://github.com/fengmic/Kemono-spider.git
 
 # 进入项目目录
-cd kemono-downloader
+cd Kemono-spider
 
 # 安装依赖
 npm install
@@ -96,7 +93,6 @@ npm run build:win
 - `win-unpacked/` - 便携版（绿色版）
 - `Kemono下载器-fengmic Setup 2.0.0.exe` - 安装程序
 
-> 💡 **提示**：编译完成后可将 exe 文件上传到 GitHub Releases 供他人下载
 
 ### macOS
 
@@ -134,7 +130,7 @@ npm run build
    - 点击 📁 按钮选择文件保存目录
 
 3. **配置参数**
-   - **限制数量**: 爬取的帖子数量（默认 50）
+   - **限制数量**: 下载的帖子数量（默认 50，0为不限制即全部下载）
    - **并发数**: 同时下载的文件数（1-10，默认 5）
    - **跳过已存在**: 勾选后会跳过已下载的文件
 
@@ -166,7 +162,7 @@ kemono-downloader/
 ├── main.js           # Electron 主进程
 ├── preload.js        # 预加载脚本（IPC 桥接）
 ├── index.html        # 主界面 HTML
-├── styles.css        # 样式表（赛博朋克主题）
+├── styles.css        # 样式表（现代化暗色主题）
 ├── app.js            # UI 控制逻辑
 ├── scraper.js        # 下载核心逻辑
 ├── package.json      # 项目配置
@@ -192,13 +188,11 @@ mainWindow.webContents.openDevTools();
 
 ## 🤝 贡献
 
-欢迎贡献代码！请遵循以下步骤：
+欢迎贡献BUG 和功能需求！
 
-1. Fork 本仓库
-2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 开启 Pull Request
+请提交ISSUE 或提交PR。
+
+
 
 ## ⚠️ 免责声明
 
