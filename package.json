@@ -1,0 +1,57 @@
+{
+  "name": "kemono-downloader-fengmic",
+  "version": "2.0.0",
+  "description": "Kemono 下载器 - fengmic",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win --x64",
+    "pack": "electron-builder --dir"
+  },
+  "keywords": [
+    "kemono",
+    "scraper",
+    "electron"
+  ],
+  "author": "Kemono Scraper Team",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.3.3",
+    "electron-builder": "^24.9.1"
+  },
+  "build": {
+    "appId": "com.fengmic.kemono.downloader",
+    "productName": "Kemono下载器-fengmic",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "index.html",
+      "styles.css",
+      "app.js",
+      "scraper.js",
+      "assets/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Kemono下载器-fengmic"
+    }
+  }
+}
