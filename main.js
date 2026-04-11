@@ -269,12 +269,10 @@ ipcMain.handle('fs-read', async (event, filePath) => {
 });
 
 ipcMain.handle('fs-download', async (event, url, filePath) => {
-    return new Promise((resolve, reject) => {
-        const urlObj = new URL(url);
+    const doRequest = (requestUrl) => new Promise((resolve, reject) => {
+        const urlObj = new URL(requestUrl);
         const protocol = urlObj.protocol === 'https:' ? https : http;
-        
-        const file = fs.createWriteStream(filePath);
-        
+
         const request = protocol.get({
             hostname: urlObj.hostname,
             path: urlObj.pathname + urlObj.search,
@@ -283,23 +281,37 @@ ipcMain.handle('fs-download', async (event, url, filePath) => {
             },
             rejectUnauthorized: false
         }, (response) => {
+            if (response.statusCode === 301 || response.statusCode === 302 || response.statusCode === 307 || response.statusCode === 308) {
+                const location = response.headers['location'];
+                if (!location) {
+                    reject(new Error(`重定向但缺少 Location 头: ${requestUrl}`));
+                    return;
+                }
+                const redirectUrl = new URL(location, requestUrl).toString();
+                resolve(doRequest(redirectUrl));
+                return;
+            }
+
+            const file = fs.createWriteStream(filePath);
             response.pipe(file);
-            
+
             file.on('finish', () => {
                 file.close();
                 resolve(true);
             });
+
+            file.on('error', (err) => {
+                fs.unlink(filePath, () => {});
+                reject(err);
+            });
         });
-        
+
         request.on('error', (err) => {
             fs.unlink(filePath, () => {});
             reject(err);
         });
-        
-        file.on('error', (err) => {
-            fs.unlink(filePath, () => {});
-            reject(err);
-        });
     });
+
+    return doRequest(url);
 });
 

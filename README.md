@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)
+![Version](https://img.shields.io/badge/version-3.0.0-blue.svg)
 ![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg)
 ![Electron](https://img.shields.io/badge/Electron-28.0-47848F.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)
@@ -91,7 +91,7 @@ npm run build:win
 
 输出文件位于 `dist/` 目录：
 - `win-unpacked/` - 便携版（绿色版）
-- `Kemono下载器-fengmic Setup 2.0.0.exe` - 安装程序
+- `Kemono-spider Setup 3.0.0.exe` - 安装程序
 
 
 ### macOS

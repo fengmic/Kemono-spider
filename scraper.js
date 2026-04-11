@@ -48,24 +48,30 @@ class KemonoScraper {
     }
 
     // 发起HTTP请求
-    async _makeRequest(url, referer = null) {
-        try {
-            const headers = this._createRequest(url, referer);
-            const response = await window.electronAPI.httpRequest({
-                url: url,
-                method: 'GET',
-                headers: headers,
-                timeout: 30000
-            });
+    async _makeRequest(url, referer = null, retries = 5) {
+        for (let attempt = 1; attempt <= retries; attempt++) {
+            try {
+                const headers = this._createRequest(url, referer);
+                const response = await window.electronAPI.httpRequest({
+                    url: url,
+                    method: 'GET',
+                    headers: headers,
+                    timeout: 30000
+                });
 
-            if (response.statusCode === 200) {
-                return { statusCode: 200, data: response.data };
-            } else {
-                return { statusCode: response.statusCode, data: null };
+                if (response.statusCode === 200) {
+                    return { statusCode: 200, data: response.data };
+                } else {
+                    return { statusCode: response.statusCode, data: null };
+                }
+            } catch (error) {
+                if (attempt < retries) {
+                    this.log(`请求失败 (${attempt}/${retries}): ${error.message}，正在重试...`, 'warning');
+                } else {
+                    this.log(`请求失败，已达最大重试次数: ${error.message}`, 'error');
+                    throw error;
+                }
             }
-        } catch (error) {
-            this.log(`请求失败: ${error.message}`, 'error');
-            throw error;
         }
     }
 
@@ -278,7 +284,7 @@ class KemonoScraper {
         this.shouldStop = false;
         this.currentTask = config;
 
-        const { service, username: userId, savePath, limit, skipExisting } = config;
+        const { service, username: userId, savePath, limit, skipExisting, concurrent = 5 } = config;
 
         try {
             this.log('========== 开始爬取任务 ==========', 'info');
@@ -401,25 +407,22 @@ class KemonoScraper {
                 // 下载附件（只下载attachments下的图片，不下载file下的图片）
                 const attachments = post.attachments || [];
                 let downloadedAttachments = 0;
-                
-                for (let j = 0; j < attachments.length; j++) {
+
+                // 并发下载附件
+                const downloadTasks = attachments
+                    .map((attachment, j) => ({ attachment, j }))
+                    .filter(({ attachment }) => attachment.path && attachment.name);
+
+                for (let k = 0; k < downloadTasks.length; k += concurrent) {
                     if (this.shouldStop) break;
-                    
-                    const attachment = attachments[j];
-                    const name = attachment.name;
-                    const url = attachment.path;
-                    
-                    if (url && name) {
-                        // 重命名为序号，保持原始后缀名
-                        const fileExtension = name.substring(name.lastIndexOf('.'));
+                    const batch = downloadTasks.slice(k, k + concurrent);
+                    const results = await Promise.all(batch.map(({ attachment, j }) => {
+                        const fileExtension = attachment.name.substring(attachment.name.lastIndexOf('.'));
                         const filename = `${j + 1}${fileExtension}`;
-                        
-                        // 下载文件
-                        if (await this.downloadFile(url, filename, postFolder)) {
-                            downloadedAttachments++;
-                            totalDownloaded++;
-                        }
-                    }
+                        return this.downloadFile(attachment.path, filename, postFolder);
+                    }));
+                    downloadedAttachments += results.filter(Boolean).length;
+                    totalDownloaded += results.filter(Boolean).length;
                 }
                 
                 // 记录该作品已完成
