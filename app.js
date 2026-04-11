@@ -1,5 +1,6 @@
 // UI控制逻辑
 let currentTaskId = null;
+let currentView = 'author'; // 'author' | 'single-post'
 
 // 页面加载完成
 document.addEventListener('DOMContentLoaded', () => {
@@ -8,88 +9,115 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // 初始化应用
 function initializeApp() {
-    // 绑定事件
-    document.getElementById('selectPathBtn').addEventListener('click', selectSavePath);
+    // 作者下载页按钮绑定
+    document.getElementById('selectPathBtn').addEventListener('click', () => selectSavePath('savePath'));
+    // 单作品下载页按钮绑定
+    document.getElementById('selectPathBtnSingle').addEventListener('click', () => selectSavePath('savePathSingle'));
+
     document.getElementById('startBtn').addEventListener('click', startTask);
     document.getElementById('stopBtn').addEventListener('click', stopTask);
     document.getElementById('resumeBtn').addEventListener('click', resumeTask);
     document.getElementById('clearLogsBtn').addEventListener('click', clearLogs);
 
     addLog('应用已启动', 'success');
-    
+
     // 显示系统信息
-    const platformName = window.electronAPI.platform === 'win32' ? 'Windows' : 
-                         window.electronAPI.platform === 'darwin' ? 'macOS' : 
-                         window.electronAPI.platform === 'linux' ? 'Linux' : 
+    const platformName = window.electronAPI.platform === 'win32' ? 'Windows' :
+                         window.electronAPI.platform === 'darwin' ? 'macOS' :
+                         window.electronAPI.platform === 'linux' ? 'Linux' :
                          window.electronAPI.platform;
-    const archName = window.electronAPI.arch === 'x64' ? '64位' : 
-                     window.electronAPI.arch === 'ia32' ? '32位' : 
-                     window.electronAPI.arch === 'arm64' ? 'ARM 64位' : 
+    const archName = window.electronAPI.arch === 'x64' ? '64位' :
+                     window.electronAPI.arch === 'ia32' ? '32位' :
+                     window.electronAPI.arch === 'arm64' ? 'ARM 64位' :
                      window.electronAPI.arch;
-    
+
     addLog(`系统: ${platformName} ${archName}`, 'info');
     addLog(`Electron: ${window.electronAPI.versions.electron} | Node: ${window.electronAPI.versions.node}`, 'info');
 }
 
-// 选择保存路径
-async function selectSavePath() {
+// 切换视图
+function switchView(view) {
+    if (currentView === view) return;
+    currentView = view;
+
+    const isAuthor = view === 'author';
+    document.getElementById('viewAuthor').style.display = isAuthor ? '' : 'none';
+    document.getElementById('viewSinglePost').style.display = isAuthor ? 'none' : '';
+    document.getElementById('tabAuthor').classList.toggle('active', isAuthor);
+    document.getElementById('tabSinglePost').classList.toggle('active', !isAuthor);
+
+    addLog(`已切换到${isAuthor ? '作者' : '单作品'}下载模式`, 'info');
+}
+
+// 选择保存路径（inputId 决定写入哪个输入框）
+async function selectSavePath(inputId) {
     const path = await window.electronAPI.selectFolder();
     if (path) {
-        document.getElementById('savePath').value = path;
+        document.getElementById(inputId).value = path;
         addLog(`已选择保存路径: ${path}`, 'info');
     }
 }
 
+// HTML 转义
+function escapeHtml(value) {
+    const div = document.createElement('div');
+    div.textContent = value ?? '';
+    return div.innerHTML;
+}
+
 // 开始任务
 async function startTask() {
-    const service = document.getElementById('service').value;
-    const username = document.getElementById('username').value.trim();
-    const savePath = document.getElementById('savePath').value.trim();
-    const limit = parseInt(document.getElementById('limit').value) || 50;
-    const concurrent = parseInt(document.getElementById('concurrent').value) || 5;
-    const skipExisting = document.getElementById('skipExisting').checked;
+    let config;
+    let taskTitle;
+    let taskInfo;
 
-    // 验证输入
-    if (!service) {
-        addLog('请选择服务平台', 'error');
-        return;
+    if (currentView === 'author') {
+        const service = document.getElementById('service').value;
+        const username = document.getElementById('username').value.trim();
+        const savePath = document.getElementById('savePath').value.trim();
+        const limit = parseInt(document.getElementById('limit').value) || 50;
+        const concurrent = parseInt(document.getElementById('concurrent').value) || 5;
+        const skipExisting = document.getElementById('skipExisting').checked;
+
+        if (!service) { addLog('请选择服务平台', 'error'); return; }
+        if (!username) { addLog('请输入作者 ID', 'error'); return; }
+        if (!savePath) { addLog('请选择保存路径', 'error'); return; }
+
+        config = { mode: 'author', service, username, savePath, limit, concurrent, skipExisting };
+        taskTitle = `${service} - ${username}`;
+        taskInfo = `限制数量: ${limit} | 并发数: ${concurrent}`;
+    } else {
+        const postUrl = document.getElementById('postUrl').value.trim();
+        const savePath = document.getElementById('savePathSingle').value.trim();
+        const concurrent = parseInt(document.getElementById('concurrentSingle').value) || 5;
+        const skipExisting = document.getElementById('skipExistingSingle').checked;
+
+        if (!postUrl) { addLog('请输入作品链接', 'error'); return; }
+        if (!savePath) { addLog('请选择保存路径', 'error'); return; }
+
+        let parsedPost;
+        try {
+            parsedPost = window.scraper.parsePostUrl(postUrl);
+        } catch (error) {
+            addLog(error.message, 'error');
+            return;
+        }
+
+        config = { mode: 'single-post', postUrl, savePath, concurrent, skipExisting };
+        taskTitle = `${parsedPost.service} - post/${parsedPost.postId}`;
+        taskInfo = `单作品下载 | 并发数: ${concurrent}`;
     }
 
-    if (!username) {
-        addLog('请输入作者ID', 'error');
-        return;
-    }
-
-    if (!savePath) {
-        addLog('请选择保存路径', 'error');
-        return;
-    }
-
-    // 禁用开始按钮，启用停止按钮
     document.getElementById('startBtn').disabled = true;
     document.getElementById('stopBtn').disabled = false;
 
-    // 创建任务显示
-    createTaskDisplay(service, username, limit);
+    createTaskDisplay(taskTitle, taskInfo);
 
-    // 配置任务
-    const config = {
-        service,
-        username,
-        savePath,
-        limit,
-        concurrent,
-        skipExisting
-    };
-
-    // 开始爬取
     await window.scraper.startScraping(config);
 
-    // 任务完成，恢复按钮状态
     document.getElementById('startBtn').disabled = false;
     document.getElementById('stopBtn').disabled = true;
 
-    // 更新任务状态
     updateTaskStatus('completed');
 }
 
@@ -105,27 +133,53 @@ function stopTask() {
 // 恢复任务
 async function resumeTask() {
     const progressFile = await window.electronAPI.selectProgressFile();
-    if (progressFile) {
-        addLog(`选择进度文件: ${progressFile}`, 'info');
-        
-        // 禁用开始按钮，启用停止按钮
-        document.getElementById('startBtn').disabled = true;
-        document.getElementById('stopBtn').disabled = false;
+    if (!progressFile) return;
 
-        // 恢复任务
-        await window.scraper.resumeFromProgress(progressFile);
+    addLog(`选择进度文件: ${progressFile}`, 'info');
 
-        // 任务完成，恢复按钮状态
-        document.getElementById('startBtn').disabled = false;
-        document.getElementById('stopBtn').disabled = true;
+    // 读取进度文件，根据 config.mode 切换到对应视图
+    try {
+        const raw = await window.electronAPI.fs.read(progressFile);
+        const progressData = JSON.parse(raw);
+        const mode = progressData?.config?.mode;
+        if (mode === 'single-post') {
+            switchView('single-post');
+        } else {
+            switchView('author');
+        }
+
+        // 生成任务标题
+        let taskTitle = '恢复任务';
+        let taskInfo = '续传中...';
+        if (mode === 'single-post' && progressData.config?.postUrl) {
+            try {
+                const p = window.scraper.parsePostUrl(progressData.config.postUrl);
+                taskTitle = `${p.service} - post/${p.postId}`;
+                taskInfo = `单作品下载 | 续传`;
+            } catch (_) {}
+        } else if (progressData.config?.service && progressData.config?.username) {
+            taskTitle = `${progressData.config.service} - ${progressData.config.username}`;
+            taskInfo = `续传 | 限制数量: ${progressData.config.limit || '-'}`;
+        }
+
+        createTaskDisplay(taskTitle, taskInfo);
+    } catch (e) {
+        addLog(`读取进度文件失败: ${e.message}`, 'error');
     }
+
+    document.getElementById('startBtn').disabled = true;
+    document.getElementById('stopBtn').disabled = false;
+
+    await window.scraper.resumeFromProgress(progressFile);
+
+    document.getElementById('startBtn').disabled = false;
+    document.getElementById('stopBtn').disabled = true;
+    updateTaskStatus('completed');
 }
 
 // 创建任务显示
-function createTaskDisplay(service, username, limit) {
+function createTaskDisplay(title, infoText) {
     const tasksContainer = document.getElementById('activeTasks');
-    
-    // 清空之前的任务
     tasksContainer.innerHTML = '';
 
     const taskId = 'task-' + Date.now();
@@ -134,11 +188,11 @@ function createTaskDisplay(service, username, limit) {
     const taskHtml = `
         <div class="task-item" id="${taskId}">
             <div class="task-header">
-                <div class="task-title">${service} - ${username}</div>
+                <div class="task-title">${escapeHtml(title)}</div>
                 <div class="task-status status-running">运行中</div>
             </div>
             <div class="task-info">
-                限制数量: ${limit} | 已下载: <span id="${taskId}-downloaded">0</span> 文件
+                ${escapeHtml(infoText)} | 已下载: <span id="${taskId}-downloaded">0</span> 文件
             </div>
             <div class="progress-bar">
                 <div class="progress-fill" id="${taskId}-progress" style="width: 0%"></div>
@@ -181,10 +235,8 @@ function updateTaskStatus(status) {
     const statusElement = taskItem.querySelector('.task-status');
     if (!statusElement) return;
 
-    // 移除所有状态类
     statusElement.classList.remove('status-running', 'status-stopped', 'status-completed');
 
-    // 添加新状态
     switch (status) {
         case 'running':
             statusElement.classList.add('status-running');
@@ -205,17 +257,14 @@ function updateTaskStatus(status) {
 window.addLog = function(message, type = 'info') {
     const logsContainer = document.getElementById('systemLogs');
     const time = new Date().toLocaleTimeString('zh-CN', { hour12: false });
-    
+
     const logEntry = document.createElement('div');
     logEntry.className = `log-entry log-${type}`;
     logEntry.innerHTML = `<span class="log-time">[${time}]</span> ${message}`;
-    
+
     logsContainer.appendChild(logEntry);
-    
-    // 自动滚动到底部
     logsContainer.scrollTop = logsContainer.scrollHeight;
 
-    // 限制日志数量
     const logs = logsContainer.querySelectorAll('.log-entry');
     if (logs.length > 200) {
         logs[0].remove();

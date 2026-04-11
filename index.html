@@ -12,65 +12,110 @@
         <div class="control-panel">
             <div class="panel-header">
                 <h1 class="app-title">KEMONO 下载器 - FENGMIC</h1>
-                <div class="version">v2.0.0</div>
+                <div class="version">v3.0.0</div>
             </div>
 
-            <div class="form-container">
-                <div class="form-group">
-                    <label>
-                        <span class="label-text">服务平台</span>
-                        <select id="service" class="service-select">
-                            <option value="fanbox">Fanbox</option>
-                            <option value="patreon">Patreon</option>
-                            <option value="fantia">Fantia</option>
-                            <option value="subscribestar">SubscribeStar</option>
-                            <option value="gumroad">Gumroad</option>
-                            <option value="discord">Discord</option>
-                        </select>
-                    </label>
+            <!-- 模式切换标签 -->
+            <div class="mode-tabs">
+                <button id="tabAuthor" class="mode-tab active" onclick="switchView('author')">作者集合下载</button>
+                <button id="tabSinglePost" class="mode-tab" onclick="switchView('single-post')">单作品下载</button>
+            </div>
+
+            <!-- 作者下载视图 -->
+            <div id="viewAuthor" class="view-panel">
+                <div class="form-container">
+                    <div class="form-group">
+                        <label>
+                            <span class="label-text">服务平台</span>
+                            <select id="service" class="service-select">
+                                <option value="fanbox">Fanbox</option>
+                                <option value="patreon">Patreon</option>
+                                <option value="fantia">Fantia</option>
+                                <option value="subscribestar">SubscribeStar</option>
+                                <option value="gumroad">Gumroad</option>
+                                <option value="discord">Discord</option>
+                            </select>
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <span class="label-text">作者 ID</span>
+                            <input type="text" id="username" placeholder="请输入作者 ID">
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <span class="label-text">保存路径</span>
+                            <div class="path-selector">
+                                <input type="text" id="savePath" placeholder="点击选择保存路径" readonly>
+                                <button id="selectPathBtn" class="btn-icon">📁</button>
+                            </div>
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <span class="label-text">限制数量</span>
+                            <input type="number" id="limit" value="50" min="1">
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <span class="label-text">并发数</span>
+                            <input type="number" id="concurrent" value="5" min="1" max="10">
+                        </label>
+                    </div>
                 </div>
 
-                <div class="form-group">
-                    <label>
-                        <span class="label-text">作者ID</span>
-                        <input type="text" id="username" placeholder="请输入作者ID">
-                    </label>
-                </div>
-
-                <div class="form-group">
-                    <label>
-                        <span class="label-text">保存路径</span>
-                        <div class="path-selector">
-                            <input type="text" id="savePath" placeholder="点击选择保存路径" readonly>
-                            <button id="selectPathBtn" class="btn-icon">📁</button>
-                        </div>
-                    </label>
-                </div>
-
-                <div class="form-group">
-                    <label>
-                        <span class="label-text">限制数量</span>
-                        <input type="number" id="limit" value="50" min="1">
-                    </label>
-                </div>
-
-                <div class="form-group">
-                    <label>
-                        <span class="label-text">并发数</span>
-                        <input type="number" id="concurrent" value="5" min="1" max="10">
+                <div class="options-row">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="skipExisting" checked>
+                        <span>跳过已存在文件</span>
                     </label>
                 </div>
             </div>
 
-            <div style="display: flex; gap: 20px; align-items: center; margin-bottom: 10px;">
-                <label class="checkbox-label">
-                    <input type="checkbox" id="skipExisting" checked>
-                    <span>跳过已存在文件</span>
-                </label>
+            <!-- 单作品下载视图 -->
+            <div id="viewSinglePost" class="view-panel" style="display:none;">
+                <div class="form-container form-container-single">
+                    <div class="form-group">
+                        <label>
+                            <span class="label-text">作品链接</span>
+                            <input type="text" id="postUrl" placeholder="例如: https://kemono.cr/fanbox/user/123/post/456">
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <span class="label-text">保存路径</span>
+                            <div class="path-selector">
+                                <input type="text" id="savePathSingle" placeholder="点击选择保存路径" readonly>
+                                <button id="selectPathBtnSingle" class="btn-icon">📁</button>
+                            </div>
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <span class="label-text">并发数</span>
+                            <input type="number" id="concurrentSingle" value="5" min="1" max="10">
+                        </label>
+                    </div>
+                </div>
+
+                <div class="options-row">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="skipExistingSingle" checked>
+                        <span>跳过已存在文件</span>
+                    </label>
+                </div>
             </div>
 
             <div class="button-group">
-                <button id="startBtn" class="btn btn-primary">🚀 开始爬取</button>
+                <button id="startBtn" class="btn btn-primary">🚀 开始下载</button>
                 <button id="stopBtn" class="btn btn-danger" disabled>⏸ 停止任务</button>
                 <button id="resumeBtn" class="btn btn-secondary">📂 续传</button>
             </div>

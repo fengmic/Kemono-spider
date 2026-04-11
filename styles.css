@@ -502,6 +502,56 @@ input[type="checkbox"] {
     opacity: 0.5;
 }
 
+/* 模式切换标签 */
+.mode-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.mode-tab {
+    padding: 6px 18px;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    letter-spacing: 0.5px;
+}
+
+.mode-tab:hover {
+    border-color: var(--accent-cyan);
+    color: var(--accent-cyan);
+}
+
+.mode-tab.active {
+    background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+    border-color: transparent;
+    color: #fff;
+    box-shadow: 0 0 14px rgba(0, 243, 255, 0.35);
+}
+
+/* 视图面板 */
+.view-panel {
+    /* shown/hidden via JS display toggle */
+}
+
+/* 单作品页 — 简化两栏网格 */
+.form-container-single {
+    grid-template-columns: 1fr 1fr;
+}
+
+/* 选项行（复选框区域） */
+.options-row {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
 /* 动画 */
 @keyframes pulse {
     0%, 100% { opacity: 1; }
