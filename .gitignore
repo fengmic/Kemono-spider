@@ -21,3 +21,6 @@ Thumbs.db
 *.exe
 *.dmg
 *.AppImage
+
+# data
+data/
