@@ -75,7 +75,7 @@ async function startTask() {
         const service = document.getElementById('service').value;
         const username = document.getElementById('username').value.trim();
         const savePath = document.getElementById('savePath').value.trim();
-        const limit = parseInt(document.getElementById('limit').value) || 50;
+        const limit = parseInt(document.getElementById('limit').value) || 0;
         const concurrent = parseInt(document.getElementById('concurrent').value) || 5;
         const skipExisting = document.getElementById('skipExisting').checked;
 
@@ -85,7 +85,7 @@ async function startTask() {
 
         config = { mode: 'author', service, username, savePath, limit, concurrent, skipExisting };
         taskTitle = `${service} - ${username}`;
-        taskInfo = `限制数量: ${limit} | 并发数: ${concurrent}`;
+        taskInfo = `限制数量: ${limit || '不限制'} | 并发数: ${concurrent}`;
     } else {
         const postUrl = document.getElementById('postUrl').value.trim();
         const savePath = document.getElementById('savePathSingle').value.trim();
@@ -159,7 +159,7 @@ async function resumeTask() {
             } catch (_) {}
         } else if (progressData.config?.service && progressData.config?.username) {
             taskTitle = `${progressData.config.service} - ${progressData.config.username}`;
-            taskInfo = `续传 | 限制数量: ${progressData.config.limit || '-'}`;
+            taskInfo = `续传 | 限制数量: ${progressData.config.limit || '不限制'}`;
         }
 
         createTaskDisplay(taskTitle, taskInfo);

@@ -27,7 +27,7 @@
                     <div class="form-group">
                         <label>
                             <span class="label-text">服务平台</span>
-                            <select id="service" class="service-select">
+                            <select id="service" class="service-select" title="对应作者作品发布的平台，如：https://kemono.cr/fanbox/user/33970936 就是fanbox">
                                 <option value="fanbox">Fanbox</option>
                                 <option value="patreon">Patreon</option>
                                 <option value="fantia">Fantia</option>
@@ -41,7 +41,7 @@
                     <div class="form-group">
                         <label>
                             <span class="label-text">作者 ID</span>
-                            <input type="text" id="username" placeholder="请输入作者 ID">
+                            <input type="text" id="username" placeholder="请输入作者 ID" title="对应作者的ID号，如https://kemono.cr/fanbox/user/33970936 就是33970936">
                         </label>
                     </div>
 
@@ -49,7 +49,7 @@
                         <label>
                             <span class="label-text">保存路径</span>
                             <div class="path-selector">
-                                <input type="text" id="savePath" placeholder="点击选择保存路径" readonly>
+                                <input type="text" id="savePath" placeholder="点击选择保存路径" readonly title="下载的图片等文件在本地的保存路径，会自动创建一个作者昵称的文件夹进行保存">
                                 <button id="selectPathBtn" class="btn-icon">📁</button>
                             </div>
                         </label>
@@ -58,14 +58,14 @@
                     <div class="form-group">
                         <label>
                             <span class="label-text">限制数量</span>
-                            <input type="number" id="limit" value="50" min="1">
+                            <input type="number" id="limit" value="0" min="0" placeholder="0 表示不限制" title="从最新发布的作品（第一页第一个）开始计数，限制爬取多少个作品，填0为无限制（全部下载）">
                         </label>
                     </div>
 
                     <div class="form-group">
                         <label>
                             <span class="label-text">并发数</span>
-                            <input type="number" id="concurrent" value="5" min="1" max="10">
+                            <input type="number" id="concurrent" value="5" min="1" max="10" title="同时会下载几个文件，能加快多个作品下载时的速度，但不要设置太大">
                         </label>
                     </div>
                 </div>
@@ -84,7 +84,7 @@
                     <div class="form-group">
                         <label>
                             <span class="label-text">作品链接</span>
-                            <input type="text" id="postUrl" placeholder="例如: https://kemono.cr/fanbox/user/123/post/456">
+                            <input type="text" id="postUrl" placeholder="例如: https://kemono.cr/fanbox/user/123/post/456" title="Kemono 上的作品页面链接，完整路径应包含 /post/ 字段，如 https://kemono.cr/fanbox/user/33970936/post/9837134">
                         </label>
                     </div>
 
@@ -92,7 +92,7 @@
                         <label>
                             <span class="label-text">保存路径</span>
                             <div class="path-selector">
-                                <input type="text" id="savePathSingle" placeholder="点击选择保存路径" readonly>
+                                <input type="text" id="savePathSingle" placeholder="点击选择保存路径" readonly title="下载的图片等文件在本地的保存路径，会自动创建一个作者昵称的文件夹进行保存">
                                 <button id="selectPathBtnSingle" class="btn-icon">📁</button>
                             </div>
                         </label>
@@ -101,7 +101,7 @@
                     <div class="form-group">
                         <label>
                             <span class="label-text">并发数</span>
-                            <input type="number" id="concurrentSingle" value="5" min="1" max="10">
+                            <input type="number" id="concurrentSingle" value="5" min="1" max="10" title="同时会下载几个文件，能加快多个作品下载时的速度，但不要设置太大">
                         </label>
                     </div>
                 </div>
