@@ -1,6 +1,6 @@
 {
   "name": "kemono-spider",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "Kemono 下载器 - fengmic",
   "main": "main.js",
   "scripts": {
@@ -15,7 +15,7 @@
     "electron"
   ],
   "author": "fengmic",
-  "license": "GPL-3.0",
+  "license": "MIT",
   "devDependencies": {
     "electron": "^28.3.3",
     "electron-builder": "^24.9.1"

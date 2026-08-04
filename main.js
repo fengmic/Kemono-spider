@@ -1,8 +1,9 @@
-const { app, BrowserWindow, ipcMain, dialog, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, screen, net } = require('electron');
 const path = require('path');
 const https = require('https');
 const http = require('http');
 const fs = require('fs');
+const fsp = fs.promises;
 const zlib = require('zlib');
 
 let mainWindow;
@@ -144,6 +145,55 @@ app.on('before-quit', () => {
     saveWindowState();
 });
 
+// IPC通信处理 - 设置代理
+ipcMain.handle('set-proxy', async (event, proxyConfig) => {
+    const { type, host, port, username, password } = proxyConfig || {};
+
+    if (!type) {
+        // 清除代理设置，恢复直连
+        try {
+            await mainWindow.webContents.session.setProxy({
+                mode: 'direct'
+            });
+            mainWindow.webContents.session.closeAllConnections();
+            return { success: true, message: '代理已禁用，使用直连' };
+        } catch (error) {
+            return { success: false, message: error.message };
+        }
+    }
+
+    try {
+        // 构造 Chromium 的 proxyRules 格式
+        // 格式: "scheme=host:port", 多个规则用分号分隔
+        let proxyRules;
+        const authPrefix = username ? `${encodeURIComponent(username)}:${encodeURIComponent(password)}@` : '';
+        const proxyAddr = `${authPrefix}${host}:${port}`;
+
+        switch (type.toLowerCase()) {
+            case 'http':
+                proxyRules = `http=${proxyAddr}`;
+                break;
+            case 'https':
+                proxyRules = `https=${proxyAddr}`;
+                break;
+            case 'socks5':
+                proxyRules = `socks5=${proxyAddr}`;
+                break;
+            default:
+                proxyRules = `${type}=${proxyAddr}`;
+        }
+
+        await mainWindow.webContents.session.setProxy({
+            proxyRules,
+            proxyBypassRules: '<local>'
+        });
+        mainWindow.webContents.session.closeAllConnections();
+        return { success: true, message: `代理已设置: ${type}://${host}:${port}` };
+    } catch (error) {
+        return { success: false, message: error.message };
+    }
+});
+
 // IPC通信处理 - 选择文件夹
 ipcMain.handle('select-folder', async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
@@ -184,8 +234,7 @@ ipcMain.handle('http-request', async (event, options) => {
             path: url.pathname + url.search,
             method: options.method || 'GET',
             headers: options.headers || {},
-            timeout: options.timeout || 30000,
-            rejectUnauthorized: false // 忽略SSL证书验证
+            timeout: options.timeout || 30000
         };
 
         const req = protocol.request(reqOptions, (res) => {
@@ -238,80 +287,189 @@ ipcMain.handle('http-request', async (event, options) => {
 
 // IPC通信处理 - 文件系统操作
 ipcMain.handle('fs-mkdir', async (event, dirPath) => {
-    return new Promise((resolve, reject) => {
-        fs.mkdir(dirPath, { recursive: true }, (err) => {
-            if (err) reject(err);
-            else resolve(true);
-        });
-    });
+    await fsp.mkdir(dirPath, { recursive: true });
+    return true;
 });
 
 ipcMain.handle('fs-exists', async (event, filePath) => {
     return fs.existsSync(filePath);
 });
 
+ipcMain.handle('fs-stat', async (event, filePath) => {
+    const stats = await fsp.stat(filePath);
+    return {
+        size: stats.size,
+        isFile: stats.isFile(),
+        isDirectory: stats.isDirectory()
+    };
+});
+
 ipcMain.handle('fs-write', async (event, filePath, content) => {
-    return new Promise((resolve, reject) => {
-        fs.writeFile(filePath, content, (err) => {
-            if (err) reject(err);
-            else resolve(true);
-        });
-    });
+    await fsp.writeFile(filePath, content);
+    return true;
 });
 
 ipcMain.handle('fs-read', async (event, filePath) => {
-    return new Promise((resolve, reject) => {
-        fs.readFile(filePath, 'utf8', (err, data) => {
-            if (err) reject(err);
-            else resolve(data);
-        });
-    });
+    return await fsp.readFile(filePath, 'utf8');
 });
 
-ipcMain.handle('fs-download', async (event, url, filePath) => {
-    const doRequest = (requestUrl) => new Promise((resolve, reject) => {
-        const urlObj = new URL(requestUrl);
-        const protocol = urlObj.protocol === 'https:' ? https : http;
+ipcMain.handle('fs-download', async (event, url, filePath, timeout = 0) => {
+    return new Promise((resolve, reject) => {
+        let timeoutHandle = null;
+        let requestCompleted = false;
+        let file = null;
+        const tempPath = `${filePath}.part`;
 
-        const request = protocol.get({
-            hostname: urlObj.hostname,
-            path: urlObj.pathname + urlObj.search,
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            },
-            rejectUnauthorized: false
-        }, (response) => {
-            if (response.statusCode === 301 || response.statusCode === 302 || response.statusCode === 307 || response.statusCode === 308) {
-                const location = response.headers['location'];
-                if (!location) {
-                    reject(new Error(`重定向但缺少 Location 头: ${requestUrl}`));
-                    return;
+        const cleanupAndReject = (error) => {
+            if (requestCompleted) return;
+            requestCompleted = true;
+            if (timeoutHandle) clearTimeout(timeoutHandle);
+            if (file) {
+                file.destroy();
+            }
+            try {
+                if (fs.existsSync(tempPath)) {
+                    fs.unlinkSync(tempPath);
                 }
-                const redirectUrl = new URL(location, requestUrl).toString();
-                resolve(doRequest(redirectUrl));
+            } catch (e) {}
+            reject(error);
+        };
+
+        const request = net.request({
+            method: 'GET',
+            url: url,
+            redirect: 'follow',
+        });
+
+        request.setHeader('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36');
+        request.setHeader('Accept', 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8');
+        request.setHeader('Accept-Language', 'zh-CN,zh;q=0.9,en;q=0.8');
+        request.setHeader('Referer', 'https://kemono.cr/');
+
+        request.on('response', (response) => {
+            if (response.statusCode >= 400) {
+                cleanupAndReject(new Error(`HTTP ${response.statusCode}`));
                 return;
             }
 
-            const file = fs.createWriteStream(filePath);
+            try {
+                if (fs.existsSync(tempPath)) {
+                    fs.unlinkSync(tempPath);
+                }
+            } catch (error) {
+                cleanupAndReject(error);
+                return;
+            }
+
+            file = fs.createWriteStream(tempPath);
+            let downloadedBytes = 0;
+            const expectedBytes = Number.parseInt(response.headers['content-length'] || '0', 10);
+
+            if (timeout > 0) {
+                timeoutHandle = setTimeout(() => {
+                    if (requestCompleted) return;
+                    request.abort();
+                    cleanupAndReject(new Error(`下载超时: 超过 ${timeout}ms`));
+                }, timeout);
+            }
+
+            response.on('data', (chunk) => {
+                downloadedBytes += chunk.length;
+            });
+
             response.pipe(file);
 
             file.on('finish', () => {
-                file.close();
-                resolve(true);
+                if (requestCompleted) return;
+                if (timeoutHandle) clearTimeout(timeoutHandle);
+                file.close(async (error) => {
+                    if (error) {
+                        cleanupAndReject(error);
+                        return;
+                    }
+
+                    if (expectedBytes > 0 && downloadedBytes !== expectedBytes) {
+                        cleanupAndReject(new Error(`下载不完整: ${downloadedBytes}/${expectedBytes} bytes`));
+                        return;
+                    }
+
+                    try {
+                        await fsp.rename(tempPath, filePath);
+                    } catch (renameError) {
+                        try {
+                            await fsp.copyFile(tempPath, filePath);
+                            await fsp.unlink(tempPath);
+                        } catch (copyError) {
+                            cleanupAndReject(copyError);
+                            return;
+                        }
+                    }
+
+                    requestCompleted = true;
+                    resolve(true);
+                });
             });
 
             file.on('error', (err) => {
-                fs.unlink(filePath, () => {});
-                reject(err);
+                cleanupAndReject(err);
+            });
+
+            response.on('error', (err) => {
+                cleanupAndReject(err);
             });
         });
 
         request.on('error', (err) => {
-            fs.unlink(filePath, () => {});
-            reject(err);
+            cleanupAndReject(err);
         });
-    });
 
-    return doRequest(url);
+        request.on('abort', () => {
+            cleanupAndReject(new Error('请求被中止'));
+        });
+
+        request.end();
+    });
 });
+
+ipcMain.handle('fs-scan-dir', async (event, dirPath) => {
+    const fileList = [];
+
+    async function scanDir(dir) {
+        try {
+            const entries = await fsp.readdir(dir, { withFileTypes: true });
+            for (const entry of entries) {
+                const fullPath = path.join(dir, entry.name);
+                try {
+                    if (entry.isDirectory()) {
+                        await scanDir(fullPath);
+                    } else if (entry.isFile()) {
+                        try {
+                            const stats = await fsp.stat(fullPath);
+                            fileList.push({
+                                name: entry.name,
+                                path: fullPath,
+                                size: stats.size
+                            });
+                        } catch (statErr) {
+                            console.warn(`无法读取文件信息: ${fullPath} - ${statErr.code}`);
+                        }
+                    }
+                } catch (entryErr) {
+                    console.warn(`处理条目出错: ${fullPath} - ${entryErr.code}`);
+                }
+            }
+        } catch (error) {
+            console.error(`扫描目录出错: ${error.message}`);
+        }
+    }
+
+    await scanDir(dirPath);
+    return fileList;
+});
+
+ipcMain.handle('fs-delete-file', async (event, filePath) => {
+    await fsp.unlink(filePath);
+    return true;
+});
+
 

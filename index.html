@@ -12,17 +12,32 @@
         <div class="control-panel">
             <div class="panel-header">
                 <h1 class="app-title">KEMONO 下载器 - FENGMIC</h1>
-                <div class="version">v3.0.0</div>
+                <div class="version">v3.0.1</div>
             </div>
 
             <!-- 模式切换标签 -->
             <div class="mode-tabs">
                 <button id="tabAuthor" class="mode-tab active" onclick="switchView('author')">作者集合下载</button>
                 <button id="tabSinglePost" class="mode-tab" onclick="switchView('single-post')">单作品下载</button>
+                <button id="tabResume" class="mode-tab" onclick="switchView('resume')">📂 续传</button>
+                <button id="tabSettings" class="mode-tab" onclick="switchView('settings')">⚙️ 设置</button>
+                <button id="tabRepair" class="mode-tab" onclick="switchView('repair')">🔧 修复</button>
             </div>
 
             <!-- 作者下载视图 -->
             <div id="viewAuthor" class="view-panel">
+                <!-- 增量下载横幅 -->
+                <div id="incrementalBanner" class="status-banner status-banner-info" style="display:none;">
+                    <div class="status-banner-content">
+                        <span class="status-banner-icon">&#x1F504;</span>
+                        <div class="status-banner-text">
+                            <strong>增量下载模式</strong>
+                            <span id="incrementalBannerDetail"></span>
+                        </div>
+                        <button id="cancelIncrementalBtn" class="btn-tiny btn-tiny-warning">改为全新下载</button>
+                    </div>
+                </div>
+
                 <div class="form-container">
                     <div class="form-group">
                         <label>
@@ -75,6 +90,10 @@
                         <input type="checkbox" id="skipExisting" checked>
                         <span>跳过已存在文件</span>
                     </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="useThumbnail">
+                        <span title="有时kemono网站服务器会出现问题，导致原图路径无法访问，这时可以下载缩略图（但是缩略图清晰度会较低）">下载缩略图版本</span>
+                    </label>
                 </div>
             </div>
 
@@ -111,13 +130,189 @@
                         <input type="checkbox" id="skipExistingSingle" checked>
                         <span>跳过已存在文件</span>
                     </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="useThumbnailSingle">
+                        <span title="有时kemono网站服务器会出现问题，导致原图路径无法访问，这时可以下载缩略图（但是缩略图清晰度会较低）">下载缩略图版本</span>
+                    </label>
                 </div>
             </div>
 
-            <div class="button-group">
+            <!-- 设置视图 -->
+            <div id="viewSettings" class="view-panel" style="display:none;">
+                <div class="form-container">
+                    <h3 class="view-heading">全局参数设置</h3>
+                    
+                    <div class="form-group">
+                        <label>
+                            <span class="label-text">HTTP 请求重试次数</span>
+                            <input type="number" id="globalRetries" value="5" min="1" max="20" title="HTTP 请求失败时的重试次数">
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <span class="label-text">图片下载超时（秒）</span>
+                            <input type="number" id="imageTimeout" value="60" min="10" max="600" title="图片文件的下载超时时间，超过此时间自动跳过">
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <span class="label-text">视频下载超时（秒）</span>
+                            <input type="number" id="videoTimeout" value="1200" min="60" max="7200" title="视频文件的下载超时时间，超过此时间自动跳过">
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <span class="label-text">页面请求间隔（毫秒）</span>
+                            <input type="number" id="pageRequestDelay" value="1500" min="500" max="5000" title="获取每一页数据之间的延迟，避免被限流">
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <span class="label-text">并发下载数</span>
+                            <input type="number" id="defaultConcurrent" value="5" min="1" max="20" title="默认的并发下载任务数量">
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <span class="label-text">批次间隔（毫秒）</span>
+                            <input type="number" id="batchDelay" value="500" min="0" max="5000" title="每批并发下载之间的等待时间，增大可降低触发限流的概率">
+                        </label>
+                    </div>
+
+                    <h3 class="view-heading" style="margin-top: 24px;">代理设置（用于绕过 CDN 封锁）</h3>
+
+                    <div class="form-group">
+                        <label>
+                            <span class="label-text">代理类型</span>
+                            <select id="proxyType" title="代理协议类型">
+                                <option value="">不使用代理</option>
+                                <option value="http">HTTP</option>
+                                <option value="https">HTTPS</option>
+                                <option value="socks5">SOCKS5</option>
+                            </select>
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <span class="label-text">代理主机</span>
+                            <input type="text" id="proxyHost" placeholder="例如: 127.0.0.1" title="代理服务器地址">
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <span class="label-text">代理端口</span>
+                            <input type="number" id="proxyPort" value="1080" min="1" max="65535" title="代理服务器端口">
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <span class="label-text">代理用户名（可选）</span>
+                            <input type="text" id="proxyUsername" placeholder="留空表示不需要认证" title="代理认证用户名，如不需要认证请留空">
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <span class="label-text">代理密码（可选）</span>
+                            <input type="password" id="proxyPassword" placeholder="留空表示不需要认证" title="代理认证密码，如不需要认证请留空">
+                        </label>
+                    </div>
+
+                    <div class="options-row">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="skipExistingDefault" checked>
+                            <span>默认跳过已存在文件</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="button-group" style="margin-top: 20px;">
+                    <button id="saveSettingsBtn" class="btn btn-primary">💾 保存设置</button>
+                    <button id="resetSettingsBtn" class="btn btn-secondary">🔄 恢复默认</button>
+                </div>
+                <div id="settingsStatus" class="settings-status"></div>
+            </div>
+            <!-- 续传视图 -->
+            <div id="viewResume" class="view-panel" style="display:none;">
+                <div class="form-container">
+                    <h3 class="view-heading">断点续传</h3>
+                    
+                    <div class="form-group">
+                        <label>
+                            <span class="label-text">选择下载进度文件</span>
+                            <div class="path-selector">
+                                <input type="text" id="resumeProgressPath" placeholder="选择 download_progress.json 文件所在的文件夹" readonly title="选择包含 download_progress.json 的文件夹（即之前的作者或作品文件夹）">
+                                <button id="selectResumePathBtn" class="btn-icon">📁</button>
+                            </div>
+                        </label>
+                    </div>
+
+                    <div id="resumeInfo" class="info-block">
+                        <h4 style="margin: 0 0 10px 0;">任务信息</h4>
+                        <div id="resumeDetails" class="details">
+                        </div>
+                    </div>
+
+                    <div class="options-row" style="margin-top: 15px;">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="resetProgressCheckbox">
+                            <span>重置下载进度（重新下载所有作品）</span>
+                        </label>
+                    </div>
+
+                    <div id="resumeStatus" class="status-console">
+                    </div>
+                </div>
+            </div>
+            <!-- 修复视图 -->
+            <div id="viewRepair" class="view-panel" style="display:none;">
+                <div class="form-container">
+                    <h3 class="view-heading">损坏文件修复</h3>
+                    
+                    <div class="form-group">
+                        <label>
+                            <span class="label-text">修复路径</span>
+                            <div class="path-selector">
+                                <input type="text" id="repairPath" placeholder="选择包含 json 文件夹和 download_progress.json 的路径" readonly title="选择已下载过的作者或作品文件夹">
+                                <button id="selectRepairPathBtn" class="btn-icon">📁</button>
+                            </div>
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <span class="label-text">文件大小限制（KB）</span>
+                            <input type="number" id="fileSizeLimit" value="100" min="1" max="10000" title="小于此大小的文件将被识别为损坏文件并删除">
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <span class="label-text">并发重新下载数</span>
+                            <input type="number" id="repairConcurrent" value="5" min="1" max="20" title="重新下载损坏文件时的并发数">
+                        </label>
+                    </div>
+                </div>
+
+                <div class="button-group" style="margin-top: 20px;">
+                    <button id="scanBtn" class="btn btn-primary">🔍 扫描损坏文件</button>
+                    <button id="repairBtn" class="btn btn-secondary" disabled>🔧 开始修复</button>
+                </div>
+                <div id="repairStatus" class="status-console" style="min-height: 100px;">
+                </div>
+            </div>
+
+            <div class="button-group" id="downloadButtonGroup">
                 <button id="startBtn" class="btn btn-primary">🚀 开始下载</button>
                 <button id="stopBtn" class="btn btn-danger" disabled>⏸ 停止任务</button>
-                <button id="resumeBtn" class="btn btn-secondary">📂 续传</button>
             </div>
         </div>
 
