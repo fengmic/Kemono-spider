@@ -11,7 +11,7 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <AssemblyName>KemonoDownloader</AssemblyName>
     <RootNamespace>KemonoDownloader.Wpf</RootNamespace>
-    <Version>4.7.2</Version>
+    <Version>3.0.0</Version>
     <Product>Kemono 下载器</Product>
     <Authors>fengmic</Authors>
   </PropertyGroup>
