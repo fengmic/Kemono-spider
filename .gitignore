@@ -1,13 +1,12 @@
-# Node modules
-node_modules/
-
-# Build output
-dist/
-out/
+# .NET build output
+bin/
+obj/
+artifacts/
+publish/
+TestResults/
 
 # Logs
 *.log
-npm-debug.log*
 
 # OS files
 .DS_Store
@@ -16,11 +15,13 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+.vs/
+*.user
+*.suo
 
-# Build files
+# Published binaries
 *.exe
-*.dmg
-*.AppImage
+*.pdb
 
 # data
 data/

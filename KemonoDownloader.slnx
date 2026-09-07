@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/KemonoDownloader.Core/KemonoDownloader.Core.csproj" />
+    <Project Path="src/KemonoDownloader.Infrastructure/KemonoDownloader.Infrastructure.csproj" />
+    <Project Path="src/KemonoDownloader.Wpf/KemonoDownloader.Wpf.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/KemonoDownloader.Tests/KemonoDownloader.Tests.csproj" />
+  </Folder>
+</Solution>
