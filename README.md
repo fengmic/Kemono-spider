@@ -1,5 +1,7 @@
 # Kemono 下载器 v3.0.0
 
+**简体中文** | [English](README.en.md)
+
 基于 .NET 10 和原生 WPF 的 Windows 桌面下载器。项目已从 Electron/Node.js 完整迁移到 C#，不再需要 Node 运行时。
 
 详细更新内容请参阅 [3.0.0 更新公告](UPDATE_NOTICE_3.0.0.md)。
