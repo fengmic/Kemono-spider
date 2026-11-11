@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# 同一分支的并发任务只保留最新一次，避免重复构建浪费额度
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  # 解决方案文件：仓库使用新的 .slnx 格式
+  SOLUTION_FILE: KemonoDownloader.slnx
+  # 允许在 Linux 上还原/编译 net*-windows 目标的项目
+  BUILD_ARGS: -p:EnableWindowsTargeting=true
+
+jobs:
+  build-and-test:
+    name: 构建与测试
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          # 与 global.json 一致：10.0.400（rollForward: latestPatch）
+          dotnet-version: '10.0.400'
+
+      - name: 缓存 NuGet 依赖
+        uses: actions/cache@v4
+        with:
+          # 缓存全局包目录，key 随项目/配置文件内容变化而失效
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/*.props', '**/*.targets', '**/packages.lock.json', 'global.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: 显示 SDK 信息
+        run: dotnet --info
+
+      - name: 还原依赖
+        run: dotnet restore "$SOLUTION_FILE"
+
+      - name: 构建
+        # Release 配置构建；Directory.Build.props 已在该配置下关闭调试符号
+        run: dotnet build "$SOLUTION_FILE" --configuration Release --no-restore $BUILD_ARGS
+
+      - name: 运行测试
+        # tests/ 目录存在时执行；解决方案内没有测试项目则跳过，构建已作为兜底校验
+        run: |
+          set -euo pipefail
+          mapfile -t TEST_PROJECTS < <(dotnet sln "$SOLUTION_FILE" list | grep -Ei 'test' || true)
+          if [ "${#TEST_PROJECTS[@]}" -eq 0 ]; then
+            echo "解决方案中未发现测试项目，跳过测试步骤"
+            exit 0
+          fi
+          printf '待测试项目:\n%s\n' "${TEST_PROJECTS[@]}"
+          dotnet test "${TEST_PROJECTS[@]}" \
+            --configuration Release \
+            --no-build \
+            --verbosity normal \
+            --logger "trx;LogFileName=test-results.trx" \
+            $BUILD_ARGS
+
+      - name: 上传测试结果
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: '**/TestResults/**/*.trx'
+          if-no-files-found: ignore
