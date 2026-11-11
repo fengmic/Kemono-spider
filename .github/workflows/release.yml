@@ -1,0 +1,284 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '要发布的 tag（如 v3.0.0）。留空则只构建产物、不创建 Release'
+        required: false
+        default: ''
+        type: string
+      prerelease:
+        description: '标记为预发布 (pre-release)'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  DOTNET_NOLOGO: '1'
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: '1'
+  RUNTIME: win-x64
+
+jobs:
+  build:
+    # WPF / WinForms 不能跨平台 publish，统一 windows-latest；RID 固定 win-x64
+    name: publish (win-x64)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET (from global.json)
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Show SDK
+        shell: pwsh
+        run: dotnet --version
+
+      - name: Resolve version
+        id: ver
+        shell: pwsh
+        env:
+          DISPATCH_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || '' }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          if ($env:GITHUB_REF_TYPE -eq 'tag') {
+            $tag = $env:GITHUB_REF_NAME
+          } else {
+            $tag = "$env:DISPATCH_TAG".Trim()
+          }
+
+          if ($tag) {
+            $version = $tag -replace '^[vV]', ''
+            if ($version -notmatch '^\d+\.\d+\.\d+([-+][0-9A-Za-z.\-+]*)?$') {
+              throw "tag '$tag' 不是合法版本号，期望 vMAJOR.MINOR.PATCH[-suffix]"
+            }
+          } else {
+            # 手动触发未给 tag：只产出 dev 版本产物，不碰 Release
+            $version = "0.0.0-dev.$env:GITHUB_RUN_NUMBER"
+          }
+
+          # AssemblyVersion / FileVersion 只接受数字段
+          $numeric = ($version -split '[-+]')[0]
+          $parts = @($numeric.Split('.') | Where-Object { $_ })
+          while ($parts.Count -lt 3) { $parts += '0' }
+          $fileVersion = '{0}.{1}.{2}.0' -f $parts[0], $parts[1], $parts[2]
+
+          $publish = [bool]($tag -and $tag.Trim())
+          @(
+            "version=$version"
+            "tag=$tag"
+            "publish=$($publish.ToString().ToLower())"
+            "numeric=$numeric"
+            "file_version=$fileVersion"
+          ) | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          Write-Host "version=$version tag='$tag' publish=$publish fileVersion=$fileVersion"
+
+      - name: Publish and package
+        id: pack
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+          NUMERIC: ${{ steps.ver.outputs.numeric }}
+          FILE_VERSION: ${{ steps.ver.outputs.file_version }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # 原生命令退出码自己判，避免 7.4+ 的策略差异影响回退逻辑
+          $PSNativeCommandUseErrorActionPreference = $false
+
+          $runtime = $env:RUNTIME
+          $version = $env:VERSION
+          $stage   = Join-Path $PWD 'artifacts'   # 只放最终产物
+          $work    = Join-Path $PWD '.publish'    # 中间目录，不进产物
+          New-Item -ItemType Directory -Path $stage -Force | Out-Null
+          New-Item -ItemType Directory -Path $work  -Force | Out-Null
+
+          # 单 TFM 项目不传 -f；多 TFM 时优先挑 windows TFM
+          function Select-Tfm([string] $text) {
+            $m = [regex]::Match($text, '<TargetFrameworks>([^<]+)</TargetFrameworks>')
+            if (-not $m.Success) { return $null }
+            $tfms = @($m.Groups[1].Value.Split(';') | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+            if ($tfms.Count -le 1) { return $null }
+            $win = $tfms | Where-Object { $_ -match 'windows' } | Select-Object -First 1
+            if ($win) { return $win }
+            return $tfms[0]
+          }
+
+          $projects = @(Get-ChildItem -Path $PWD -Filter *.csproj -Recurse -File |
+            Where-Object {
+              $_.FullName -notmatch '[\\/](bin|obj|artifacts|\.publish|\.git)[\\/]' -and
+              $_.FullName -notmatch '[\\/]tests?[\\/]'
+            })
+
+          $apps = @()
+          foreach ($p in $projects) {
+            $text = Get-Content -Raw -LiteralPath $p.FullName
+            if ($text -match '<IsTestProject>\s*true' -or $text -match 'Microsoft\.NET\.Test\.Sdk') { continue }
+
+            $outputType = $null
+            try {
+              [xml] $xml = $text
+              $outputType = @($xml.Project.PropertyGroup.OutputType) |
+                Where-Object { $_ } | Select-Object -First 1
+            } catch {
+              $m = [regex]::Match($text, '<OutputType>\s*([^<]+)\s*</OutputType>')
+              if ($m.Success) { $outputType = $m.Groups[1].Value.Trim() }
+            }
+
+            if ($outputType -in @('Exe', 'WinExe')) { $apps += $p }
+            elseif ($text -match '<(UseWPF|UseWindowsForms)>\s*true') { $apps += $p }
+          }
+          if (-not $apps -and $projects.Count -eq 1) { $apps = $projects }
+          if (-not $apps) { throw '未找到可发布的可执行项目 (OutputType=Exe|WinExe)' }
+
+          $rows = @()
+          foreach ($app in $apps) {
+            $name = $app.BaseName
+            $tfm  = Select-Tfm (Get-Content -Raw -LiteralPath $app.FullName)
+            $out  = Join-Path $work "publish/$name"
+            $zip  = Join-Path $stage "$name-$version-$runtime.zip"
+
+            $common = @(
+              $app.FullName
+              '-c', 'Release'
+              '-r', $runtime
+              '--self-contained', 'true'
+              "-p:Version=$version"
+              "-p:AssemblyVersion=$env:NUMERIC"
+              "-p:FileVersion=$env:FILE_VERSION"
+              '-p:ContinuousIntegrationBuild=true'
+              '-o', $out
+            )
+            if ($tfm) { $common = @('-f', $tfm) + $common }
+
+            Write-Host "::group::publish $($app.Name)"
+
+            # 首选单文件自包含 exe
+            & dotnet publish @common '-p:PublishSingleFile=true' `
+              '-p:IncludeNativeLibrariesForSelfExtract=true' 2>&1 | Write-Host
+            $singleFile = ($LASTEXITCODE -eq 0)
+
+            if (-not $singleFile) {
+              # 单文件与 WPF 资源 / 第三方 native 冲突时回退多文件发布
+              Write-Host "单文件发布失败，回退多文件发布: $($app.Name)"
+              Remove-Item -LiteralPath $out -Recurse -Force -ErrorAction SilentlyContinue
+              & dotnet publish @common 2>&1 | Write-Host
+              if ($LASTEXITCODE -ne 0) { throw "dotnet publish 失败: $($app.FullName)" }
+            }
+
+            $exe = Get-ChildItem -LiteralPath $out -Filter *.exe -File -ErrorAction SilentlyContinue |
+              Select-Object -First 1
+            if (-not $exe) { throw "publish 输出中没有 .exe: $out" }
+
+            # 单文件时额外单独提交 exe，方便直接下载运行
+            if ($singleFile) {
+              Copy-Item -LiteralPath $exe.FullName `
+                -Destination (Join-Path $stage "$name-$version-$runtime.exe") -Force
+            }
+
+            Compress-Archive -Path (Join-Path $out '*') -DestinationPath $zip -Force
+
+            $rows += [pscustomobject]@{
+              Project = $app.Name
+              TFM     = if ($tfm) { $tfm } else { '-' }
+              Exe     = $exe.Name
+              Single  = $singleFile
+              Package = Split-Path $zip -Leaf
+            }
+            Write-Host "::endgroup::"
+          }
+
+          # 校验和：只对 zip / 独立 exe 计算，SHA256SUMS.txt 不参与自校验
+          $payload = @(Get-ChildItem -LiteralPath $stage -File | Sort-Object Name)
+          $hashes  = @{}
+          foreach ($f in $payload) {
+            $hashes[$f.Name] = (Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash.ToLower()
+          }
+          ($payload | ForEach-Object { '{0}  {1}' -f $hashes[$_.Name], $_.Name }) |
+            Set-Content -LiteralPath (Join-Path $stage 'SHA256SUMS.txt') -Encoding utf8
+
+          # Release 说明的下载清单：文件名 + 大小 + 校验值
+          function Format-Size([long] $bytes) {
+            if ($bytes -ge 1MB) { return '{0:N1} MB' -f ($bytes / 1MB) }
+            if ($bytes -ge 1KB) { return '{0:N0} KB' -f ($bytes / 1KB) }
+            return '{0} B' -f $bytes
+          }
+          $all = @(Get-ChildItem -LiteralPath $stage -File | Sort-Object Name)
+          $md  = @('## 下载', '', '| 文件 | 大小 | SHA256 |', '| --- | --- | --- |')
+          foreach ($f in $all) {
+            $hash = if ($hashes.ContainsKey($f.Name)) { $hashes[$f.Name] } else { '—' }
+            $md += '| `{0}` | {1} | `{2}` |' -f $f.Name, (Format-Size $f.Length), $hash
+          }
+          $md += ''
+          $md += '校验：`sha256sum -c SHA256SUMS.txt`（Windows 可用 `Get-FileHash`）。'
+          $md | Set-Content -LiteralPath (Join-Path $work 'release-notes.md') -Encoding utf8
+
+          $rows | Format-Table -AutoSize | Out-String | Write-Host
+          $all | ForEach-Object { Write-Host ('{0,12:N0}  {1}' -f $_.Length, $_.Name) }
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.event.repository.name }}-${{ steps.ver.outputs.version }}-${{ env.RUNTIME }}
+          path: artifacts/*
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Create GitHub Release
+        if: steps.ver.outputs.publish == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: ${{ steps.ver.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          generate_release_notes: true
+          prerelease: ${{ inputs.prerelease || contains(steps.ver.outputs.version, '-') }}
+          fail_on_unmatched_files: true
+          files: artifacts/*
+
+      # Release 建好后，把下载清单追加到自动生成的说明之后
+      - name: Append download list to release notes
+        if: steps.ver.outputs.publish == 'true'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.ver.outputs.tag }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $false
+
+          $notesFile = Join-Path $PWD '.publish/release-notes.md'
+          $bodyFile  = Join-Path $PWD '.publish/release-body.md'
+
+          $existing = gh release view $env:TAG --json body -q .body
+          if ($LASTEXITCODE -ne 0) { throw "读取 Release 失败: $env:TAG" }
+
+          $download = Get-Content -Raw -LiteralPath $notesFile
+          if (-not $download) { throw "下载清单为空: $notesFile" }
+
+          # 已有正文可能为空，合并后压掉多余空行
+          $parts = @($existing, $download) | Where-Object { $_ -and $_.Trim() }
+          $body  = ($parts -join "`n`n")
+          $body  = ($body -replace '(`r?`n){3,}', "`n`n").Trim()
+
+          Set-Content -LiteralPath $bodyFile -Value $body -Encoding utf8
+          gh release edit $env:TAG --notes-file $bodyFile
+          if ($LASTEXITCODE -ne 0) { throw "更新 Release 说明失败: $env:TAG" }
+          Write-Host "已写入下载清单: $env:TAG"
