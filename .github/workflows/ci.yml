@@ -52,7 +52,7 @@ jobs:
         run: dotnet --info
 
       - name: 还原依赖
-        run: dotnet restore "$SOLUTION_FILE"
+        run: dotnet restore "$SOLUTION_FILE" $BUILD_ARGS
 
       - name: 构建
         # Release 配置构建；Directory.Build.props 已在该配置下关闭调试符号
