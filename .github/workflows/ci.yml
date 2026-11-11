@@ -20,13 +20,11 @@ env:
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
   # 解决方案文件：仓库使用新的 .slnx 格式
   SOLUTION_FILE: KemonoDownloader.slnx
-  # 允许在 Linux 上还原/编译 net*-windows 目标的项目
-  BUILD_ARGS: -p:EnableWindowsTargeting=true
 
 jobs:
   build-and-test:
     name: 构建与测试
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     timeout-minutes: 30
 
     steps:
@@ -52,13 +50,14 @@ jobs:
         run: dotnet --info
 
       - name: 还原依赖
-        run: dotnet restore "$SOLUTION_FILE" $BUILD_ARGS
+        run: dotnet restore "$SOLUTION_FILE"
 
       - name: 构建
         # Release 配置构建；Directory.Build.props 已在该配置下关闭调试符号
-        run: dotnet build "$SOLUTION_FILE" --configuration Release --no-restore $BUILD_ARGS
+        run: dotnet build "$SOLUTION_FILE" --configuration Release --no-restore
 
       - name: 运行测试
+        shell: bash
         # tests/ 目录存在时执行；解决方案内没有测试项目则跳过，构建已作为兜底校验
         run: |
           set -euo pipefail
@@ -73,7 +72,7 @@ jobs:
             --no-build \
             --verbosity normal \
             --logger "trx;LogFileName=test-results.trx" \
-            $BUILD_ARGS
+           
 
       - name: 上传测试结果
         if: always()
