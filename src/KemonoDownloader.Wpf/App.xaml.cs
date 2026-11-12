@@ -1,5 +1,7 @@
+using System;
 using System.Windows;
 using System.IO;
+using System.Windows.Markup;
 using KemonoDownloader.Infrastructure;
 using KemonoDownloader.Wpf.Services;
 using KemonoDownloader.Wpf.ViewModels;
@@ -10,8 +12,22 @@ public partial class App : System.Windows.Application
 {
     private NetworkClientProvider? _networkClientProvider;
 
+    /// <summary>
+    /// 模板里的 Storyboard 用 DynamicResource 引用，在控件应用模板时才解析；
+    /// 因此把动效字典挂进主题字典自己的 MergedDictionaries，运行期换整份字典也能生效。
+    /// 系统关闭「动画效果」时用空的 Animations.Reduced.xaml 顶替，键齐全、数值不动。
+    /// </summary>
+    private void ApplyTheme()
+    {
+        var motion = Helpers.Motion.AnimationsEnabled ? "Animations" : "Animations.Reduced";
+        var theme = new ResourceDictionary { Source = new Uri("Themes/AnimeTheme.xaml", UriKind.Relative) };
+        theme.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri($"Themes/{motion}.xaml", UriKind.Relative) });
+        Resources.MergedDictionaries.Add(theme);
+    }
+
     protected override async void OnStartup(StartupEventArgs e)
     {
+        ApplyTheme();
         base.OnStartup(e);
         try
         {

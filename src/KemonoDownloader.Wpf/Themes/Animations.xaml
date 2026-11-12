@@ -1,0 +1,83 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- 时长与缓动集中在这里：调手感只改这一个文件，模板里不再出现魔法数字 -->
+    <Duration x:Key="MotionFast">0:0:0.14</Duration>
+    <Duration x:Key="MotionNormal">0:0:0.22</Duration>
+
+    <CubicEase x:Key="MotionEaseOut" EasingMode="EaseOut" />
+
+    <!-- 共享 Storyboard 必须 x:Shared="False"：一个 Storyboard 实例只能被一个 StoryboardClock 使用，
+         第二个 BeginStoryboard 拿到同一个实例会直接抛异常。TargetName 解析在模板的名字域内完成，
+         因此模板里必须保留 ButtonBorder / ButtonScale / ButtonLift / NavScale / SelectionBar / ContentBorder 等名字。 -->
+    <Storyboard x:Key="PressDownStoryboard" x:Shared="False">
+        <DoubleAnimation Storyboard.TargetName="ButtonScale" Storyboard.TargetProperty="ScaleX"
+                         To="0.96" Duration="{StaticResource MotionFast}" EasingFunction="{StaticResource MotionEaseOut}" />
+        <DoubleAnimation Storyboard.TargetName="ButtonScale" Storyboard.TargetProperty="ScaleY"
+                         To="0.96" Duration="{StaticResource MotionFast}" EasingFunction="{StaticResource MotionEaseOut}" />
+    </Storyboard>
+
+    <Storyboard x:Key="PressDownStrongStoryboard" x:Shared="False">
+        <DoubleAnimation Storyboard.TargetName="ButtonScale" Storyboard.TargetProperty="ScaleX"
+                         To="0.92" Duration="{StaticResource MotionFast}" EasingFunction="{StaticResource MotionEaseOut}" />
+        <DoubleAnimation Storyboard.TargetName="ButtonScale" Storyboard.TargetProperty="ScaleY"
+                         To="0.92" Duration="{StaticResource MotionFast}" EasingFunction="{StaticResource MotionEaseOut}" />
+    </Storyboard>
+
+    <Storyboard x:Key="PressUpStoryboard" x:Shared="False">
+        <DoubleAnimation Storyboard.TargetName="ButtonScale" Storyboard.TargetProperty="ScaleX"
+                         To="1" Duration="{StaticResource MotionNormal}" EasingFunction="{StaticResource MotionEaseOut}" />
+        <DoubleAnimation Storyboard.TargetName="ButtonScale" Storyboard.TargetProperty="ScaleY"
+                         To="1" Duration="{StaticResource MotionNormal}" EasingFunction="{StaticResource MotionEaseOut}" />
+    </Storyboard>
+
+    <Storyboard x:Key="HoverLiftStoryboard" x:Shared="False">
+        <DoubleAnimation Storyboard.TargetName="ButtonLift" Storyboard.TargetProperty="Y"
+                         To="-1" Duration="{StaticResource MotionNormal}" EasingFunction="{StaticResource MotionEaseOut}" />
+    </Storyboard>
+
+    <Storyboard x:Key="HoverRestoreStoryboard" x:Shared="False">
+        <DoubleAnimation Storyboard.TargetName="ButtonLift" Storyboard.TargetProperty="Y"
+                         To="0" Duration="{StaticResource MotionNormal}" EasingFunction="{StaticResource MotionEaseOut}" />
+    </Storyboard>
+
+    <!-- 导航项：左侧色条 0→3，卡片 1→1.02 -->
+    <Storyboard x:Key="NavItemSelectedStoryboard" x:Shared="False">
+        <DoubleAnimation Storyboard.TargetName="SelectionBar" Storyboard.TargetProperty="Width"
+                         To="3" Duration="{StaticResource MotionNormal}" EasingFunction="{StaticResource MotionEaseOut}" />
+        <DoubleAnimation Storyboard.TargetName="NavScale" Storyboard.TargetProperty="ScaleX"
+                         To="1.02" Duration="{StaticResource MotionNormal}" EasingFunction="{StaticResource MotionEaseOut}" />
+        <DoubleAnimation Storyboard.TargetName="NavScale" Storyboard.TargetProperty="ScaleY"
+                         To="1.02" Duration="{StaticResource MotionNormal}" EasingFunction="{StaticResource MotionEaseOut}" />
+    </Storyboard>
+
+    <Storyboard x:Key="NavItemUnselectedStoryboard" x:Shared="False">
+        <DoubleAnimation Storyboard.TargetName="SelectionBar" Storyboard.TargetProperty="Width"
+                         To="0" Duration="{StaticResource MotionFast}" EasingFunction="{StaticResource MotionEaseOut}" />
+        <DoubleAnimation Storyboard.TargetName="NavScale" Storyboard.TargetProperty="ScaleX"
+                         To="1" Duration="{StaticResource MotionFast}" EasingFunction="{StaticResource MotionEaseOut}" />
+        <DoubleAnimation Storyboard.TargetName="NavScale" Storyboard.TargetProperty="ScaleY"
+                         To="1" Duration="{StaticResource MotionFast}" EasingFunction="{StaticResource MotionEaseOut}" />
+    </Storyboard>
+
+    <!-- Expander：MaxHeight 从 0 推到 6000 后 HoldEnd 保持，内容再多也不会被裁断 -->
+    <Storyboard x:Key="ExpandStoryboard" x:Shared="False">
+        <DoubleAnimation Storyboard.TargetName="ContentBorder" Storyboard.TargetProperty="MaxHeight"
+                         To="6000" Duration="{StaticResource MotionNormal}" EasingFunction="{StaticResource MotionEaseOut}" />
+        <DoubleAnimation Storyboard.TargetName="ContentBorder" Storyboard.TargetProperty="Opacity"
+                         To="1" Duration="{StaticResource MotionNormal}" EasingFunction="{StaticResource MotionEaseOut}" />
+    </Storyboard>
+
+    <Storyboard x:Key="CollapseStoryboard" x:Shared="False">
+        <DoubleAnimation Storyboard.TargetName="ContentBorder" Storyboard.TargetProperty="MaxHeight"
+                         To="0" Duration="{StaticResource MotionFast}" EasingFunction="{StaticResource MotionEaseOut}" />
+        <DoubleAnimation Storyboard.TargetName="ContentBorder" Storyboard.TargetProperty="Opacity"
+                         To="0" Duration="{StaticResource MotionFast}" EasingFunction="{StaticResource MotionEaseOut}" />
+    </Storyboard>
+
+    <!-- indeterminate 流光：亮带用 TranslateTransform 平移（FrameworkElement 的变换永远可动画；
+         不去碰 GradientStop.Offset，模板里的 Freezable 可能已被冻结，动画会在运行期抛异常） -->
+    <Storyboard x:Key="IndeterminateGlowStoryboard" x:Shared="False">
+        <DoubleAnimation Storyboard.TargetName="GlowSweepShift" Storyboard.TargetProperty="X"
+                         From="-140" To="920" Duration="0:0:1.3" RepeatBehavior="Forever" />
+    </Storyboard>
+</ResourceDictionary>

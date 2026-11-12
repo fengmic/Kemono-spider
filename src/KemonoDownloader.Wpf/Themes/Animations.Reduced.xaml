@@ -1,0 +1,15 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- 系统关闭「动画效果」时用这份空动效字典顶替 Animations.xaml：
+         所有键都保留为空 Storyboard，模板里的 StaticResource 仍能解析，只是不动。 -->
+    <Storyboard x:Key="PressDownStoryboard" x:Shared="False" />
+    <Storyboard x:Key="PressDownStrongStoryboard" x:Shared="False" />
+    <Storyboard x:Key="PressUpStoryboard" x:Shared="False" />
+    <Storyboard x:Key="HoverLiftStoryboard" x:Shared="False" />
+    <Storyboard x:Key="HoverRestoreStoryboard" x:Shared="False" />
+    <Storyboard x:Key="NavItemSelectedStoryboard" x:Shared="False" />
+    <Storyboard x:Key="NavItemUnselectedStoryboard" x:Shared="False" />
+    <Storyboard x:Key="ExpandStoryboard" x:Shared="False" />
+    <Storyboard x:Key="CollapseStoryboard" x:Shared="False" />
+    <Storyboard x:Key="IndeterminateGlowStoryboard" x:Shared="False" />
+</ResourceDictionary>

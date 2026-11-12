@@ -3,11 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:KemonoDownloader.Wpf"
              ShutdownMode="OnMainWindowClose">
-    <Application.Resources>
-        <ResourceDictionary>
-            <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="Themes/DarkTheme.xaml" />
-            </ResourceDictionary.MergedDictionaries>
-        </ResourceDictionary>
-    </Application.Resources>
+    <!-- 主题字典在 OnStartup 里按系统动画设置装入，见 App.xaml.cs ApplyTheme。
+         模板里的 Storyboard 用 StaticResource 引用，解析发生在字典加载时，
+         所以「关闭动画」必须在加载之前选定用哪份动效字典，无法事后覆盖。 -->
 </Application>
