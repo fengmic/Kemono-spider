@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <AssemblyName>MotionProbe</AssemblyName>
+    <RootNamespace>MotionProbe</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Page Include="..\..\src\KemonoDownloader.Wpf\Themes\AnimeTheme.xaml" Link="Themes\AnimeTheme.xaml" />
+    <Page Include="..\..\src\KemonoDownloader.Wpf\Themes\Animations.xaml" Link="Themes\Animations.xaml" />
+  </ItemGroup>
+</Project>
