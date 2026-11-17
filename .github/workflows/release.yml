@@ -105,16 +105,24 @@ jobs:
   # 2. 打包。WPF/WinForms 只能在 Windows 上发布，且必须显式指定 -r win-x64
   # ---------------------------------------------------------------------------
   build:
-    name: Publish ${{ matrix.rid }}
+    name: Publish ${{ matrix.rid }} (${{ matrix.variant }})
     needs: version
     runs-on: windows-latest
     strategy:
       fail-fast: false
       matrix:
         # WPF/WinForms 只支持 Windows RID。若将来出现跨平台入口（控制台/ASP.NET），
-        # 在此追加 linux-x64 / osx-arm64，并把 runs-on 改成按 rid 的表达式。
-        rid:
-          - win-x64
+        # 在此追加 linux-x64 / osx-arm64 的 include 项，并把 runs-on 改成按 rid 的表达式。
+        # 同一 rid 出两条 leg：自包含（推荐，免装运行时）与框架依赖（体积更小，需装运行时）。
+        include:
+          - rid: win-x64
+            variant: self-contained
+            self_contained: 'true'
+            suffix: ''
+          - rid: win-x64
+            variant: framework-dependent
+            self_contained: 'false'
+            suffix: '-fd'
     env:
       VERSION: ${{ needs.version.outputs.version }}
       NUMERIC_VERSION: ${{ needs.version.outputs.numeric }}
@@ -195,7 +203,7 @@ jobs:
             'publish', $env:PROJECT_PATH,
             '--configuration', $env:CONFIGURATION,
             '--runtime', '${{ matrix.rid }}',
-            '--self-contained', 'true',
+            '--self-contained', '${{ matrix.self_contained }}',
             '--output', $out,
             "-p:Version=$env:VERSION",
             "-p:FileVersion=$env:NUMERIC_VERSION",
@@ -223,7 +231,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $name = "$env:APP_NAME-$env:VERSION-${{ matrix.rid }}"
+          $name = "$env:APP_NAME-$env:VERSION-${{ matrix.rid }}${{ matrix.suffix }}"
           $zip = Join-Path $env:RUNNER_TEMP "$name.zip"
           if (Test-Path $zip) { Remove-Item -Force $zip }
           Compress-Archive -Path (Join-Path $env:PUBLISH_DIR '*') -DestinationPath $zip -CompressionLevel Optimal
@@ -234,8 +242,8 @@ jobs:
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.APP_NAME }}-${{ env.VERSION }}-${{ matrix.rid }}
-          path: ${{ runner.temp }}/${{ env.APP_NAME }}-${{ env.VERSION }}-${{ matrix.rid }}.zip
+          name: ${{ env.APP_NAME }}-${{ env.VERSION }}-${{ matrix.rid }}${{ matrix.suffix }}
+          path: ${{ runner.temp }}/${{ env.APP_NAME }}-${{ env.VERSION }}-${{ matrix.rid }}${{ matrix.suffix }}.zip
           if-no-files-found: error
           retention-days: 14
 

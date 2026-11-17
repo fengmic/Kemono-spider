@@ -2,6 +2,12 @@
 
 本项目的显著变更记录于此。版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/) 规范。
 
+## [未发布]
+
+### 新增 (Added)
+
+- **框架依赖发布包**：新增框架依赖（framework-dependent）发布包 `KemonoDownloader-<版本>-win-x64-fd.zip`，同样是单个 `KemonoDownloader.exe`，体积更小，需要目标机器安装 .NET 10 Desktop Runtime（x64）。原有的自包含包名称与免装运行时的行为保持不变，仍为推荐项。
+
 ## [3.0.0] - 2026-09-07
 
 > 提交：`4abda21` · 作者：renwentong · 变更规模：60 个文件，+6,880 / −9,403 行

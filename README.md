@@ -34,9 +34,10 @@
 
 ### 运行方式
 
-两种方式任选其一：
+三种方式任选其一，其中前两种是发布包的两种形态（见下方「产物与分发」）：
 
-- **绿色版（推荐）**：解压发布包，双击 `KemonoDownloader.exe`。该版本是 win-x64 自包含单文件，不需要另外安装 .NET Desktop Runtime。
+- **绿色版（推荐）**：解压 `KemonoDownloader-<版本>-win-x64.zip`，双击 `KemonoDownloader.exe`。该版本是 win-x64 自包含单文件，不需要另外安装 .NET Desktop Runtime。
+- **精简版（framework-dependent）**：解压 `KemonoDownloader-<版本>-win-x64-fd.zip`，同样是单个 `KemonoDownloader.exe`，但体积明显更小；运行前需要先安装 [.NET 10 Desktop Runtime（x64）](https://dotnet.microsoft.com/download/dotnet/10.0)。没装运行时双击会直接提示缺少运行时并退出。
 - **源码运行**：安装 .NET SDK 10.0.400 后，在仓库根目录执行：
 
 ```powershell
@@ -180,7 +181,10 @@ https://kemono.cr/fanbox/user/123456/post/7890123
 - Windows 10 或更高版本（发布配置仅提供 win-x64）
 - 开发环境：.NET SDK 10.0.400 或兼容的 .NET 10 SDK
 
-发布的自包含版本不要求用户另外安装 .NET Desktop Runtime。
+发布包对运行时的要求分两种：
+
+- 自包含包（文件名不带后缀，推荐）：不要求用户另外安装 .NET Desktop Runtime。
+- 框架依赖包（文件名带 `-fd` 后缀）：需要目标机器安装 .NET 10 Desktop Runtime（x64），换来明显更小的体积。
 
 ## 开发
 
@@ -212,17 +216,29 @@ dotnet publish src\KemonoDownloader.Wpf\KemonoDownloader.Wpf.csproj `
 - `-p:PublishProfile=win-x64` 读取 `src\KemonoDownloader.Wpf\Properties\PublishProfiles\win-x64.pubxml`，其中已经固定 `Configuration=Release`、`RuntimeIdentifier=win-x64`、`SelfContained=true`、`PublishSingleFile=true`、`IncludeNativeLibrariesForSelfExtract=true`、`EnableCompressionInSingleFile=true`、`PublishTrimmed=false`。
 - `-c Release` 与 profile 中的配置一致，显式写上便于命令本身自解释；`Directory.Build.props` 在 Release 下关闭调试符号。
 
+仓库没有框架依赖包的 PublishProfile，需要时直接给参数（输出到独立目录，避免覆盖自包含产物）：
+
+```powershell
+dotnet publish src\KemonoDownloader.Wpf\KemonoDownloader.Wpf.csproj `
+  -c Release -r win-x64 --self-contained false `
+  -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true `
+  -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false `
+  -o artifacts\publish\win-x64-fd
+```
+
 ### 产物与分发
 
-输出目录为 `artifacts\publish\win-x64\`（来自 profile 的 `PublishDir`），主要产物是单个文件：
+自包含包输出到 `artifacts\publish\win-x64\`（来自 profile 的 `PublishDir`），框架依赖包输出到 `artifacts\publish\win-x64-fd\`（来自上面的 `-o`），两者都只有一个可执行文件：
 
 ```text
 artifacts\publish\win-x64\KemonoDownloader.exe
+artifacts\publish\win-x64-fd\KemonoDownloader.exe
 ```
 
 - 文件名来自 `AssemblyName=KemonoDownloader`，图标来自 `ApplicationIcon=..\..\assets\app-icon.ico`。
-- 自包含 + 单文件，目标机器不需要安装 .NET Desktop Runtime，可以直接改名、压缩或拷贝分发。
-- 没有启用裁剪（`PublishTrimmed=false`）和 ReadyToRun，首次启动会比再次启动慢一些。
+- 两者都是单文件，但运行时形态不同：自包含包内嵌 .NET 运行时，目标机器不需要安装 .NET Desktop Runtime，可以直接改名、压缩或拷贝分发；框架依赖包只含应用本身，目标机器必须先装 .NET 10 Desktop Runtime（x64）。
+- `PublishSingleFile=true` 只要求显式 RID，不要求自包含，所以框架依赖包同样是单 exe，不会把一堆 dll 丢给用户。
+- 没有启用裁剪（`PublishTrimmed=false`）和 ReadyToRun，首次启动会比再次启动慢一些。WPF 的 XAML 加载与绑定走反射，开启裁剪会在运行期崩溃，因此不用裁剪来减体积。
 - 单文件内含原生库，首次运行会解压到当前用户的临时目录，属于正常行为；不要只拷走运行中生成的临时文件。
 
 ### 常见问题
@@ -230,6 +246,8 @@ artifacts\publish\win-x64\KemonoDownloader.exe
 - `dotnet` 无法识别：未安装 SDK，或版本低于 `global.json` 的要求，安装 .NET SDK 10.0.400 后重试。
 - 忘了 `-p:PublishProfile=win-x64`：产物会落在 `bin\Release\net10.0-windows\publish\` 且是多个文件的框架依赖版本，需要在目标机器装 .NET Desktop Runtime。
 - 复用旧目录导致文件混杂：删除 `artifacts\publish\win-x64\` 后重新发布。
+- 下载的 exe 太大：改用文件名带 `-fd` 后缀的框架依赖包，体积明显更小，但需要先安装 [.NET 10 Desktop Runtime（x64）](https://dotnet.microsoft.com/download/dotnet/10.0)。
+- 我这台机器已经装了运行时：可以直接用 `-fd` 包，没必要下自包含包。
 - 单文件被杀毒软件误报：加入白名单，或用源码自行构建。
 - 需要其它架构：当前只提供 win-x64，其它架构需自行新增 `PublishProfile` 并修改 `RuntimeIdentifier`，同时注意 WPF 仅支持 Windows。
 
