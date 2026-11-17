@@ -34,9 +34,10 @@ For detailed release information, see the [3.0.0 release notes](UPDATE_NOTICE_3.
 
 ### Ways to Run
 
-Pick either:
+Three ways to run, the first two being the two shapes of the release package (see [Output and Distribution](#output-and-distribution)):
 
-- **Prebuilt build (recommended)**: unzip the release package and double-click `KemonoDownloader.exe`. It is a self-contained single file for win-x64, so no separate .NET Desktop Runtime installation is required.
+- **Prebuilt build (recommended)**: unzip `KemonoDownloader-<version>-win-x64.zip` and double-click `KemonoDownloader.exe`. It is a self-contained single file for win-x64, so no separate .NET Desktop Runtime installation is required.
+- **Slim build (framework-dependent)**: unzip `KemonoDownloader-<version>-win-x64-fd.zip`. It is also a single `KemonoDownloader.exe`, but noticeably smaller, and it requires [.NET 10 Desktop Runtime (x64)](https://dotnet.microsoft.com/download/dotnet/10.0) to be installed first. On a machine without the runtime, double-clicking shows a missing-runtime message and exits.
 - **Run from source**: install .NET SDK 10.0.400, then run this from the repository root:
 
 ```powershell
@@ -180,7 +181,10 @@ The Settings page is split into server domains, download settings, and proxy set
 - Windows 10 or later (the publish profile only targets win-x64)
 - Development environment: .NET SDK 10.0.400 or a compatible .NET 10 SDK
 
-The published self-contained build does not require users to install the .NET Desktop Runtime separately.
+The two published packages differ in runtime requirements:
+
+- Self-contained package (no suffix in the file name, recommended): users do not need to install the .NET Desktop Runtime separately.
+- Framework-dependent package (`-fd` suffix): requires the .NET 10 Desktop Runtime (x64) on the target machine, in exchange for a much smaller size.
 
 ## Development
 
@@ -212,17 +216,29 @@ dotnet publish src\KemonoDownloader.Wpf\KemonoDownloader.Wpf.csproj `
 - `-p:PublishProfile=win-x64` loads `src\KemonoDownloader.Wpf\Properties\PublishProfiles\win-x64.pubxml`, which fixes `Configuration=Release`, `RuntimeIdentifier=win-x64`, `SelfContained=true`, `PublishSingleFile=true`, `IncludeNativeLibrariesForSelfExtract=true`, `EnableCompressionInSingleFile=true`, and `PublishTrimmed=false`.
 - `-c Release` matches the profile and makes the command self-explanatory; `Directory.Build.props` disables debug symbols in Release.
 
+The repository has no publish profile for the framework-dependent package, so pass the parameters directly (the separate output directory keeps the self-contained build intact):
+
+```powershell
+dotnet publish src\KemonoDownloader.Wpf\KemonoDownloader.Wpf.csproj `
+  -c Release -r win-x64 --self-contained false `
+  -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true `
+  -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false `
+  -o artifacts\publish\win-x64-fd
+```
+
 ### Output and Distribution
 
-Output goes to `artifacts\publish\win-x64\` (the profile's `PublishDir`), and the main artifact is a single file:
+The self-contained package goes to `artifacts\publish\win-x64\` (the profile's `PublishDir`) and the framework-dependent package to `artifacts\publish\win-x64-fd\` (from the `-o` above); each contains exactly one executable:
 
 ```text
 artifacts\publish\win-x64\KemonoDownloader.exe
+artifacts\publish\win-x64-fd\KemonoDownloader.exe
 ```
 
 - The file name comes from `AssemblyName=KemonoDownloader`, and the icon from `ApplicationIcon=..\..\assets\app-icon.ico`.
-- Self-contained and single-file, so target machines need no .NET Desktop Runtime; you can rename, compress, or copy it freely.
-- Trimming (`PublishTrimmed=false`) and ReadyToRun are disabled, so the first launch is slower than later ones.
+- Both are single files, but they embed different things: the self-contained package bundles the .NET runtime, so target machines need no .NET Desktop Runtime and you can rename, compress, or copy it freely; the framework-dependent package contains only the app, so the target machine must have the .NET 10 Desktop Runtime (x64) installed.
+- `PublishSingleFile=true` only requires an explicit RID, not self-containment, so the framework-dependent package is also a single exe and does not hand users a folder of dlls.
+- Trimming (`PublishTrimmed=false`) and ReadyToRun are disabled, so the first launch is slower than later ones. WPF loads XAML and binds through reflection, so trimming crashes at runtime and is not an option for shrinking the build.
 - Native libraries are embedded in the single file, so the first run extracts them to the current user's temp directory. That is expected; do not ship only the extracted temp files.
 
 ### Troubleshooting
@@ -230,6 +246,8 @@ artifacts\publish\win-x64\KemonoDownloader.exe
 - `dotnet` is not recognized: the SDK is missing or older than `global.json` requires; install .NET SDK 10.0.400 and retry.
 - Forgot `-p:PublishProfile=win-x64`: output lands in `bin\Release\net10.0-windows\publish\` as a framework-dependent multi-file build that needs the .NET Desktop Runtime on the target machine.
 - Mixed files from a previous publish: delete `artifacts\publish\win-x64\` and publish again.
+- The downloaded exe is too large: switch to the framework-dependent package with the `-fd` suffix; it is much smaller but requires [.NET 10 Desktop Runtime (x64)](https://dotnet.microsoft.com/download/dotnet/10.0).
+- This machine already has the runtime: use the `-fd` package instead of downloading the self-contained one.
 - Antivirus flags the single file: add it to an allow list, or build from source.
 - Other architectures: only win-x64 is provided. Add another `PublishProfile` and change `RuntimeIdentifier` yourself, keeping in mind that WPF is Windows-only.
 
