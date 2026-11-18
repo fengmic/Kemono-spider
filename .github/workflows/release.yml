@@ -209,13 +209,20 @@ jobs:
             "-p:FileVersion=$env:NUMERIC_VERSION",
             "-p:AssemblyVersion=$env:NUMERIC_VERSION",
             "-p:InformationalVersion=$env:VERSION",
-            '-p:PublishSingleFile=true',
-            '-p:IncludeNativeLibrariesForSelfExtract=true',
-            '-p:EnableCompressionInSingleFile=true',
             '-p:DebugType=none',
             '-p:DebugSymbols=false',
             '-p:ContinuousIntegrationBuild=true'
           )
+          # 单文件与压缩只对 self-contained 有效；框架依赖变体必须输出多文件，
+          # 否则 .NET SDK 会报 NETSDK1176。
+          if ('${{ matrix.self_contained }}' -eq 'true') {
+            $dotnetArgs += @(
+              '-p:PublishSingleFile=true',
+              '-p:IncludeNativeLibrariesForSelfExtract=true',
+              '-p:EnableCompressionInSingleFile=true'
+            )
+          }
+
           if ($env:TARGET_FRAMEWORK) { $dotnetArgs += @('--framework', $env:TARGET_FRAMEWORK) }
 
           Write-Host "dotnet $($dotnetArgs -join ' ')"
