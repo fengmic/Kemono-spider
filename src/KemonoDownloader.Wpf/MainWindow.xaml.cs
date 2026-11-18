@@ -24,7 +24,6 @@ public partial class MainWindow : Window
         DataContext = viewModel;
         _viewModel = viewModel;
         _windowStateStore = windowStateStore;
-        Loaded += (_, _) => _windowStateStore.Restore(this);
         StateChanged += (_, _) => UpdateMaximizeButton();
         viewModel.Logs.CollectionChanged += ScrollLogsToEnd;
     }
@@ -48,10 +47,13 @@ public partial class MainWindow : Window
     {
         base.OnSourceInitialized(e);
         var source = HwndSource.FromHwnd(new WindowInteropHelper(this).Handle);
+        FitToWorkArea();
+        // HWND 已存在但尚未渲染，此时应用上次的尺寸与位置不会闪。
+        _windowStateStore.Restore(this);
         source?.AddHook(WindowProcedure);
     }
 
-    private static IntPtr WindowProcedure(IntPtr windowHandle, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
+    private IntPtr WindowProcedure(IntPtr windowHandle, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
         if (message == WmGetMinMaxInfo)
         {
@@ -61,7 +63,7 @@ public partial class MainWindow : Window
         return IntPtr.Zero;
     }
 
-    private static void ApplyMonitorWorkArea(IntPtr windowHandle, IntPtr minMaxInfoPointer)
+    private void ApplyMonitorWorkArea(IntPtr windowHandle, IntPtr minMaxInfoPointer)
     {
         var monitor = MonitorFromWindow(windowHandle, MonitorDefaultToNearest);
         if (monitor == IntPtr.Zero) return;
@@ -69,12 +71,48 @@ public partial class MainWindow : Window
         var monitorInfo = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>() };
         if (!GetMonitorInfo(monitor, ref monitorInfo)) return;
 
+        var workWidth = monitorInfo.WorkArea.Right - monitorInfo.WorkArea.Left;
+        var workHeight = monitorInfo.WorkArea.Bottom - monitorInfo.WorkArea.Top;
+        var scale = GetDpiForWindow(windowHandle) / 96.0;
+        if (scale <= 0) scale = 1.0;
+
         var minMaxInfo = Marshal.PtrToStructure<MinMaxInfo>(minMaxInfoPointer);
         minMaxInfo.MaxPosition.X = monitorInfo.WorkArea.Left - monitorInfo.MonitorArea.Left;
         minMaxInfo.MaxPosition.Y = monitorInfo.WorkArea.Top - monitorInfo.MonitorArea.Top;
-        minMaxInfo.MaxSize.X = monitorInfo.WorkArea.Right - monitorInfo.WorkArea.Left;
-        minMaxInfo.MaxSize.Y = monitorInfo.WorkArea.Bottom - monitorInfo.WorkArea.Top;
+        minMaxInfo.MaxSize.X = workWidth;
+        minMaxInfo.MaxSize.Y = workHeight;
+        minMaxInfo.MaxTrackSize.X = workWidth;
+        minMaxInfo.MaxTrackSize.Y = workHeight;
+        minMaxInfo.MinTrackSize.X = (int)Math.Min(Math.Round(MinWidth * scale), workWidth);
+        minMaxInfo.MinTrackSize.Y = (int)Math.Min(Math.Round(MinHeight * scale), workHeight);
         Marshal.StructureToPtr(minMaxInfo, minMaxInfoPointer, false);
+    }
+
+    private void FitToWorkArea()
+    {
+        var windowHandle = new WindowInteropHelper(this).Handle;
+        if (windowHandle == IntPtr.Zero) return;
+
+        var monitor = MonitorFromWindow(windowHandle, MonitorDefaultToNearest);
+        if (monitor == IntPtr.Zero) return;
+
+        var monitorInfo = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>() };
+        if (!GetMonitorInfo(monitor, ref monitorInfo)) return;
+
+        var scale = GetDpiForWindow(windowHandle) / 96.0;
+        if (scale <= 0) scale = 1.0;
+
+        var workLeft = monitorInfo.WorkArea.Left / scale;
+        var workTop = monitorInfo.WorkArea.Top / scale;
+        var workWidth = (monitorInfo.WorkArea.Right - monitorInfo.WorkArea.Left) / scale;
+        var workHeight = (monitorInfo.WorkArea.Bottom - monitorInfo.WorkArea.Top) / scale;
+
+        MinWidth = Math.Min(MinWidth, workWidth);
+        MinHeight = Math.Min(MinHeight, workHeight);
+        Width = Math.Min(Width, workWidth);
+        Height = Math.Min(Height, workHeight);
+        Left = workLeft + Math.Max(0, (workWidth - Width) / 2);
+        Top = workTop + Math.Max(0, (workHeight - Height) / 2);
     }
 
     private void ScrollLogsToEnd(object? sender, NotifyCollectionChangedEventArgs e)
@@ -109,6 +147,9 @@ public partial class MainWindow : Window
     [DllImport("user32.dll", CharSet = CharSet.Auto)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GetMonitorInfo(IntPtr monitorHandle, ref MonitorInfo monitorInfo);
+
+    [DllImport("user32.dll")]
+    private static extern uint GetDpiForWindow(IntPtr windowHandle);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct NativePoint

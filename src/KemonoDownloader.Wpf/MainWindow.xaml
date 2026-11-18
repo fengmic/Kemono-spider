@@ -10,7 +10,7 @@
         Icon="Assets/app-icon.png"
         Width="1160" Height="800"
         MinWidth="960" MinHeight="680"
-        WindowStartupLocation="CenterScreen"
+        WindowStartupLocation="Manual"
         WindowStyle="None"
         ResizeMode="CanResize">
     <shell:WindowChrome.WindowChrome>
