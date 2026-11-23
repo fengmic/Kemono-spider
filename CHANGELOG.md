@@ -8,6 +8,11 @@
 
 - **框架依赖发布包**：新增框架依赖（framework-dependent）发布包 `KemonoDownloader-<版本>-win-x64-fd.zip`，同样是单个 `KemonoDownloader.exe`，体积更小，需要目标机器安装 .NET 10 Desktop Runtime（x64）。原有的自包含包名称与免装运行时的行为保持不变，仍为推荐项。
 
+### 变更 (Changed)
+
+- **窗口外观对齐 Windows 11**：在 Win11 上主窗口改用系统圆角，并启用深色沉浸模式（标题栏由系统按深色绘制，不再出现深色界面配黑字标题栏）。两项都通过 `DwmSetWindowAttribute` 设置，失败时静默回退：Win10 与 Win11 21H2 不认识这些属性，界面与改动前逐像素一致。
+- 界面框架仍为 WPF，控件模板、配色与布局均未改动。**Mica 背衬未采用**：窗口使用 `WindowStyle=None` + `WindowChrome` 自绘标题栏，实测三种接通方式（`GlassFrameThickness` 取 1 / 取 -1 / 显式 `DwmExtendFrameIntoClientArea`）均无法让 Mica 参与合成，客户区像素在不同壁纸下完全一致。若确需 Mica，需要改用 WinUI 3 / Windows App SDK 的重写路线，不在本次范围内。
+
 ## [3.0.0] - 2026-09-07
 
 > 提交：`4abda21` · 作者：renwentong · 变更规模：60 个文件，+6,880 / −9,403 行

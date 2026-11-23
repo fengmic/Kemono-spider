@@ -4,6 +4,8 @@
 
 基于 .NET 10 和原生 WPF 的 Windows 桌面下载器。项目已从 Electron/Node.js 完整迁移到 C#，不再需要 Node 运行时。
 
+界面层是 **WPF**（`src/KemonoDownloader.Wpf`，MVVM + 手写控件模板，没有引入任何 UI 框架包）。在 Windows 11 上主窗口使用系统圆角与深色沉浸标题栏；Windows 10 与 Windows 11 21H2 不认识这些 DWM 属性，会自动退回改动前的观感。Mica 背衬未启用——自绘标题栏（`WindowStyle=None` + `WindowChrome`）下实测无法让它参与合成，详见 [CHANGELOG](CHANGELOG.md) 的「未发布」段。
+
 详细更新内容请参阅 [3.0.0 更新公告](UPDATE_NOTICE_3.0.0.md)。
 
 ![主页面](img/主页面.png)
@@ -185,6 +187,8 @@ https://kemono.cr/fanbox/user/123456/post/7890123
 
 - 自包含包（文件名不带后缀，推荐）：不要求用户另外安装 .NET Desktop Runtime。
 - 框架依赖包（文件名带 `-fd` 后缀）：需要目标机器安装 .NET 10 Desktop Runtime（x64），换来明显更小的体积。
+
+窗口外观随系统版本变化，不影响功能：Windows 11 使用系统圆角与深色沉浸标题栏；Windows 10 与 Windows 11 21H2 不支持这些 DWM 属性，会自动回退为改动前的观感。两种情况下 `.NET 10` 与 `win-x64` 的前提都不变。
 
 ## 开发
 

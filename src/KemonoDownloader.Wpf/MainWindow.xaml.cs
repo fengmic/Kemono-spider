@@ -13,6 +13,9 @@ public partial class MainWindow : Window
 {
     private const int WmGetMinMaxInfo = 0x0024;
     private const uint MonitorDefaultToNearest = 0x00000002;
+    private const int DwmwaUseImmersiveDarkMode = 20;
+    private const int DwmwaWindowCornerPreference = 33;
+    private const int DwmwcpRound = 2;
     private readonly WindowStateStore _windowStateStore;
     private readonly MainViewModel _viewModel;
     private bool _shutdownCompleted;
@@ -46,11 +49,36 @@ public partial class MainWindow : Window
     protected override void OnSourceInitialized(EventArgs e)
     {
         base.OnSourceInitialized(e);
-        var source = HwndSource.FromHwnd(new WindowInteropHelper(this).Handle);
+        var windowHandle = new WindowInteropHelper(this).Handle;
+        // 先套用 DWM 外观再摆窗口，避免用户看到一次无背衬的初始绘制。
+        ApplyWindowAppearance(windowHandle);
+        var source = HwndSource.FromHwnd(windowHandle);
         FitToWorkArea();
         // HWND 已存在但尚未渲染，此时应用上次的尺寸与位置不会闪。
         _windowStateStore.Restore(this);
         source?.AddHook(WindowProcedure);
+    }
+
+    /// <summary>
+    /// 在 Win11 22H2 及以上套用系统外观：深色沉浸标题栏与圆角窗口。
+    /// 每项都按 <see cref="DwmSetWindowAttribute"/> 的返回值判断，Win10 / Win11 21H2 返回
+    /// E_INVALIDARG 时静默跳过，观感与改动前一致。
+    /// </summary>
+    /// <remarks>
+    /// 不设置 DWMWA_SYSTEMBACKDROP_TYPE（Mica）：本窗口是 WindowStyle=None + WindowChrome 的自绘标题栏。
+    /// 实测三种接通方式（GlassFrameThickness 取 1 / 取 -1 / 显式 DwmExtendFrameIntoClientArea）
+    /// 都无法让 Mica 参与合成——客户区像素在不同壁纸下完全一致，始终是 DWM 的实色回退。
+    /// 与其保留一条“看起来接上了但实际不透”的代码，不如只留确实生效的两项。
+    /// </remarks>
+    private void ApplyWindowAppearance(IntPtr windowHandle)
+    {
+        if (windowHandle == IntPtr.Zero) return;
+
+        var enabled = 1;
+        _ = DwmSetWindowAttribute(windowHandle, DwmwaUseImmersiveDarkMode, ref enabled, sizeof(int));
+
+        var cornerPreference = DwmwcpRound;
+        _ = DwmSetWindowAttribute(windowHandle, DwmwaWindowCornerPreference, ref cornerPreference, sizeof(int));
     }
 
     private IntPtr WindowProcedure(IntPtr windowHandle, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
@@ -150,6 +178,12 @@ public partial class MainWindow : Window
 
     [DllImport("user32.dll")]
     private static extern uint GetDpiForWindow(IntPtr windowHandle);
+
+    /// <summary>
+    /// 返回 0 表示当前系统的 DWM 接受该属性；Win10 与 Win11 21H2 对圆角属性返回 E_INVALIDARG。
+    /// </summary>
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(IntPtr windowHandle, int attribute, ref int value, int size);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct NativePoint
